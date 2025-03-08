@@ -1,12 +1,8 @@
 # Sử dụng Node.js mới nhất
 FROM node:latest
 
-# Cài đặt các công cụ cần thiết
-RUN apk add --no-cache \
-    curl \
-    htop \
-    speedtest-cli \
-    && npm install -g cloudflared \
+# Cài đặt các module cần thiết
+RUN npm install -g cloudflared \
     && npm install node-telegram-bot-api \
     && npm install tcp-port-used
 
