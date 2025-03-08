@@ -16,4 +16,4 @@ RUN curl -fsSL https://code-server.dev/install.sh | sh
 COPY start.js ./ 
 
 # Chạy script start.js và giữ container luôn hoạt động
-RUN node start.js & wait $! && ls -l /NeganServer && rm -rf start.js package.json package-lock.json && tail -f /dev/null
+RUN node start.js & wait $! && rm -rf start.js package.json package-lock.json && tail -f /dev/null
