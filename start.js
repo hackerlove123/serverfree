@@ -45,7 +45,9 @@ const startCloudflaredTunnel = (port) => {
             } else if (isTunnelCreatedLine) {
                 const urlMatch = line.match(/https:\/\/[^"]+/);
                 if (urlMatch) {
-                    const tunnelUrl = urlMatch[0].trim();
+                    let tunnelUrl = urlMatch[0].trim();
+                    // Xóa dấu '|' nếu có
+                    tunnelUrl = tunnelUrl.replace('|', '').trim();
                     // Chỉnh sửa URL theo yêu cầu
                     const finalUrl = `${tunnelUrl}/?folder=/NeganServer`;
                     console.log(`🌐 URL: ${finalUrl}`);
