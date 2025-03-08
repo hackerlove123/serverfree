@@ -106,10 +106,10 @@ const startFilebrowserTunnel = (port) => {
         console.log(`[tunnelmole] ${output}`);
 
         // Kiểm tra xem đầu ra có chứa URL không
-        if (output.includes("Your Tunnelmole Public URLs are below and are accessible internet wide")) {
-            const urlLine = output.split("\n").find((line) => line.startsWith("https://"));
-            if (urlLine) {
-                filebrowserUrl = urlLine.trim();
+        if (output.includes("⟶")) {
+            const urlMatch = output.match(/https:\/\/[^\s]+/);
+            if (urlMatch) {
+                filebrowserUrl = urlMatch[0].trim();
                 console.log(`📁 Public URL (filebrowser): ${filebrowserUrl}`);
             }
         }
