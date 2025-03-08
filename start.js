@@ -2,8 +2,8 @@ const { exec, spawn } = require("child_process");
 const TelegramBot = require('node-telegram-bot-api');
 
 // Cấu hình
-const BOT_TOKEN = "7828296793:AAEw4A7NI8tVrdrcR0TQZXyOpNSPbJmbGUU";
-const GROUP_CHAT_ID = -1002423723717; // ID nhóm cụ thể
+const BOT_TOKEN = "7828296793:AAEw4A7NI8tVrdrcR0TQZXyOpNSPbJmbGUU"; // Thay thế bằng token của bạn
+const GROUP_CHAT_ID = -1002423723717; // Thay thế bằng ID nhóm của bạn
 
 // Khởi tạo bot Telegram
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
@@ -15,10 +15,11 @@ let isReady = false; // Trạng thái bot đã sẵn sàng hay chưa
 // --------------------- Hàm gửi tin nhắn ---------------------
 const sendTelegramMessage = async (chatId, message) => {
     try {
-        await bot.sendMessage(chatId, message);
+        await bot.sendMessage(chatId, message, { parse_mode: "Markdown" });
         console.log(`📤 Đã gửi tin nhắn đến ${chatId}: ${message}`);
     } catch (error) {
         console.error(`❌ Lỗi khi gửi tin nhắn đến ${chatId}:`, error);
+        throw error; // Ném lỗi để xử lý tiếp
     }
 };
 
@@ -54,19 +55,24 @@ const startCloudflaredTunnel = (port) => {
             if (line.includes("Your quick Tunnel has been created! Visit it at")) {
                 isTunnelCreatedLine = true;
             } else if (isTunnelCreatedLine) {
-                const urlMatch = line.match(/https:\/\/[^"]+/);
+                const urlMatch = line.match(/https:\/\/[^\s]+/); // Sửa regex để bắt URL chính xác hơn
                 if (urlMatch) {
                     let tunnelUrl = urlMatch[0].trim().replace('|', '').trim();
                     publicUrl = `${tunnelUrl}/?folder=/NeganServer`; // Lưu URL
                     console.log(`🌐 Public URL: ${publicUrl}`);
 
-                    // Thông báo hoàn tất
+                    // Gửi thông báo hoàn tất
                     sendTelegramMessage(
                         GROUP_CHAT_ID,
                         `🎉 **Server đã sẵn sàng!**\n` +
                         `👉 Hãy gọi lệnh /getlink để nhận Public URL.\n` +
                         `🔗 URL sẽ được gửi riêng cho bạn qua tin nhắn cá nhân.`
-                    );
+                    ).then(() => {
+                        console.log("📤 Tin nhắn thông báo đã được gửi thành công!");
+                    }).catch((error) => {
+                        console.error("❌ Lỗi khi gửi tin nhắn thông báo:", error);
+                    });
+
                     isTunnelCreatedLine = false; // Đặt lại cờ
                     isReady = true; // Đánh dấu bot đã sẵn sàng
                 }
