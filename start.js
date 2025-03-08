@@ -89,7 +89,7 @@ const startTunnel = (port) => {
     tunnelProcess.stderr.on("data", (data) => handleOutput(data.toString()));
     tunnelProcess.on("close", (code) => {
         console.log(`🔴 Tunnel đã đóng với mã ${code}`);
-        sendTelegramMessage(GROUP_CHAT_ID, `🔴 Tunnel đã đóng với mã ${code}`);
+        sendTelegramMessage(GROUP_CHAT_ID, `🔴 CLF đã đóng với mã ${code}`);
     });
 };
 
@@ -99,7 +99,7 @@ const startServerAndTunnel = async () => {
         // Tìm port trống
         PORT = await findAvailablePort();
         console.log(`🚀 Đang khởi chạy server trên port ${PORT}...`);
-        await sendTelegramMessage(GROUP_CHAT_ID, "🔄 Đang khởi chạy Server...");
+        await sendTelegramMessage(GROUP_CHAT_ID, "🔄 Đang khởi chạy SERVICES...");
 
         const serverProcess = spawn("code-server", ["--bind-addr", `0.0.0.0:${PORT}`, "--auth", "none"]);
 
@@ -109,10 +109,10 @@ const startServerAndTunnel = async () => {
         // Đợi server khởi động
         await waitForServer();
         console.log("✅ Server đã sẵn sàng!");
-        await sendTelegramMessage(GROUP_CHAT_ID, "✅ Server đã sẵn sàng");
+        await sendTelegramMessage(GROUP_CHAT_ID, "✅ SERVICES đã sẵn sàng");
 
         console.log("🚀 Đang khởi chạy Tunnel...");
-        await sendTelegramMessage(GROUP_CHAT_ID, "🔄 Đang thiết lập Tunnel...");
+        await sendTelegramMessage(GROUP_CHAT_ID, "🔄 Đang thiết lập SERVER...");
 
         startTunnel(PORT);
     } catch (error) {
