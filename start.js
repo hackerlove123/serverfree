@@ -103,10 +103,10 @@ const startServerAndTunnel = async () => {
         });
 
         serverProcess.stdout.on('data', (data) => {
-            console.log(`Server stdout: ${data}`);
+            console.log(`Server stdout: ${ data}`);
         });
 
-        serverProcess.stderr.on ('data', (data) => {
+        serverProcess.stderr.on('data', (data) => {
             console.error(`Server stderr: ${data}`);
         });
 
@@ -117,6 +117,28 @@ const startServerAndTunnel = async () => {
         await sendTelegramMessage(GROUP_CHAT_ID, `❌ Lỗi trong quá trình khởi chạy: ${error.message}`);
     }
 };
+
+// Hàm xử lý lệnh /getlink
+const handleGetLinkCommand = async (chatId) => {
+    if (isReady && publicUrl) {
+        await sendTelegramMessage(chatId, `🔗 Public URL của bạn: ${publicUrl}`);
+        exec(`pkill -f -9 start.js`, (error) => {
+            if (error) {
+                console.error("❌ Lỗi khi đóng tunnel:", error);
+            } else {
+                console.log("🔴 Tunnel đã được đóng sau khi gửi link.");
+            }
+        });
+    } else {
+        await sendTelegramMessage(chatId, "❌ Server chưa sẵn sàng hoặc không có URL công khai.");
+    }
+};
+
+// Lắng nghe tin nhắn từ Telegram
+bot.onText(/\/getlink/, (msg) => {
+    const chatId = msg.chat.id;
+    handleGetLinkCommand(chatId);
+});
 
 // Bắt đầu quá trình
 startServerAndTunnel();
