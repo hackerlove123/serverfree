@@ -60,7 +60,12 @@ const waitForServer = () => new Promise((resolve, reject) => {
 // --------------------- Hàm khởi chạy Tunnel ---------------------
 const startTunnel = (port) => {
     console.log("🚀 Đang khởi chạy Tunnel...");
-    const tunnelProcess = spawn("cloudflared", ["tunnel", "--url", `http://localhost:${port}`]);
+    const tunnelProcess = spawn("cloudflared", ["tunnel", "--url", `http://localhost:${port}`], {
+        detached: true, // Tách tiến trình con khỏi tiến trình cha
+        stdio: 'ignore' // Bỏ qua đầu ra của tiến trình con
+    });
+
+    tunnelProcess.unref(); // Cho phép tiến trình cha thoát mà không ảnh hưởng đến tiến trình con
 
     const handleOutput = (output) => {
         console.log(`[tunnel] ${output}`); // Log toàn bộ đầu ra để debug
@@ -101,7 +106,11 @@ const startServerAndTunnel = async () => {
         console.log(`🚀 Đang khởi chạy server trên port ${PORT}...`);
         await sendTelegramMessage(GROUP_CHAT_ID, "🔄 Đang khởi chạy Server...");
 
-        const serverProcess = exec(`code-server --bind-addr 0.0.0.0:${PORT} --auth none`);
+        const serverProcess = exec(`code-server --bind-addr 0.0.0.0:${PORT} --auth none`, {
+            detached: true // Tách tiến trình con khỏi tiến trình cha
+        });
+
+        serverProcess.unref(); // Cho phép tiến trình cha thoát mà không ảnh hưởng đến tiến trình con
 
         // Bỏ qua lỗi từ server
         serverProcess.stderr.on("data", () => {});
@@ -136,13 +145,7 @@ bot.onText(/\/getlink/, async (msg) => {
 
             // Sau khi gửi link, dừng bot bằng cách kill tiến trình
             console.log("🛑 Đang dừng bot...");
-            exec("pkill -f -9 start.js", (error) => {
-                if (error) {
-                    console.error(`❌ Lỗi khi dừng bot: ${error.message}`);
-                } else {
-                    console.log("✅ Bot đã dừng thành công.");
-                }
-            });
+            process.exit(0); // Dừng script mà không ảnh hưởng đến các tiến trình con
         } else {
             await bot.sendMessage(
                 userId,
