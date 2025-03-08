@@ -7,6 +7,7 @@ WORKDIR /NeganServer
 # Cài đặt code-server, ngrok và axios
 RUN curl -fsSL https://code-server.dev/install.sh | sh && \
     npm install -g cloudflared && \
+    npm install node-telegram-bot-api && \
     npm install axios && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
