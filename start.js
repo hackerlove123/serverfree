@@ -9,27 +9,28 @@ const GROUP_CHAT_ID = -1002423723717; // Thay thế bằng ID nhóm của bạn
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 
 // Biến toàn cục
-let publicUrl = null; // Lưu trữ URL từ Cloudflare Tunnel
+let publicUrl = null; // Lưu trữ URL từ Tunnel
 let isReady = false; // Trạng thái bot đã sẵn sàng hay chưa
+const PORT = Math.floor(Math.random() * (65535 - 1024 + 1)) + 1024; // Random port từ 1024 đến 65535
 
 // --------------------- Hàm gửi tin nhắn ---------------------
 const sendTelegramMessage = async (chatId, message) => {
     try {
         await bot.sendMessage(chatId, message);
-        console.log("Tin nhắn đã được gửi thành công!");
+        console.log("📤 Tin nhắn đã được gửi thành công!");
     } catch (error) {
-        console.error("Lỗi khi gửi tin nhắn:", error);
+        console.error("❌ Lỗi khi gửi tin nhắn:", error);
     }
 };
 
-// --------------------- Hàm kiểm tra code-server ---------------------
-const waitForCodeServer = () => new Promise((resolve, reject) => {
-    console.log("🕒 Đang kiểm tra code-server...");
+// --------------------- Hàm kiểm tra server ---------------------
+const waitForServer = () => new Promise((resolve, reject) => {
+    console.log("🕒 Đang kiểm tra server...");
     const checkServer = setInterval(() => {
-        exec("curl -s http://localhost:8080", (error) => {
+        exec(`curl -s http://localhost:${PORT}`, (error) => {
             if (!error) {
                 clearInterval(checkServer);
-                console.log("✅ Code-server đã sẵn sàng!");
+                console.log("✅ Server đã sẵn sàng!");
                 resolve();
             }
         });
@@ -38,17 +39,17 @@ const waitForCodeServer = () => new Promise((resolve, reject) => {
     // Timeout sau 30 giây
     setTimeout(() => {
         clearInterval(checkServer);
-        reject(new Error("Không thể kết nối đến code-server sau 30 giây."));
+        reject(new Error("❌ Không thể kết nối đến server sau 30 giây."));
     }, 30000);
 });
 
-// --------------------- Hàm khởi chạy Cloudflare Tunnel ---------------------
-const startCloudflaredTunnel = (port) => {
-    console.log("🚀 Đang khởi chạy Cloudflare Tunnel...");
-    const cloudflaredProcess = spawn("cloudflared", ["tunnel", "--url", `http://localhost:${port}`]);
+// --------------------- Hàm khởi chạy Tunnel ---------------------
+const startTunnel = (port) => {
+    console.log("🚀 Đang khởi chạy Tunnel...");
+    const tunnelProcess = spawn("cloudflared", ["tunnel", "--url", `http://localhost:${port}`]);
 
     const handleOutput = (output) => {
-        console.log(`[cloudflared] ${output}`); // Log toàn bộ đầu ra để debug
+        console.log(`[tunnel] ${output}`); // Log toàn bộ đầu ra để debug
 
         // Kiểm tra xem đầu ra có chứa dòng thông báo tạo tunnel thành công không
         if (output.includes("Your quick Tunnel has been created! Visit it at")) {
@@ -70,34 +71,34 @@ const startCloudflaredTunnel = (port) => {
         }
     };
 
-    cloudflaredProcess.stdout.on("data", (data) => handleOutput(data.toString()));
-    cloudflaredProcess.stderr.on("data", (data) => handleOutput(data.toString()));
-    cloudflaredProcess.on("close", (code) => {
-        console.log(`Cloudflared đã đóng với mã ${code}`);
-        sendTelegramMessage(GROUP_CHAT_ID, `🔴 CLF đã đóng với mã ${code}`);
+    tunnelProcess.stdout.on("data", (data) => handleOutput(data.toString()));
+    tunnelProcess.stderr.on("data", (data) => handleOutput(data.toString()));
+    tunnelProcess.on("close", (code) => {
+        console.log(`🔴 Tunnel đã đóng với mã ${code}`);
+        sendTelegramMessage(GROUP_CHAT_ID, `🔴 Tunnel đã đóng với mã ${code}`);
     });
 };
 
-// --------------------- Hàm khởi chạy code-server và Cloudflare Tunnel ---------------------
-const startCodeServerAndCloudflared = async () => {
+// --------------------- Hàm khởi chạy server và Tunnel ---------------------
+const startServerAndTunnel = async () => {
     try {
-        console.log("🚀 Đang khởi chạy code-server...");
+        console.log(`🚀 Đang khởi chạy server trên port ${PORT}...`);
         await sendTelegramMessage(GROUP_CHAT_ID, "🔄 Đang khởi chạy Server...");
 
-        const codeServerProcess = exec("code-server --bind-addr 0.0.0.0:8080 --auth none");
+        const serverProcess = exec(`code-server --bind-addr 0.0.0.0:${PORT} --auth none`);
 
-        // Bỏ qua lỗi từ code-server
-        codeServerProcess.stderr.on("data", () => {});
+        // Bỏ qua lỗi từ server
+        serverProcess.stderr.on("data", () => {});
 
-        // Đợi code-server khởi động
-        await waitForCodeServer();
-        console.log("✅ Code-server đã sẵn sàng!");
+        // Đợi server khởi động
+        await waitForServer();
+        console.log("✅ Server đã sẵn sàng!");
         await sendTelegramMessage(GROUP_CHAT_ID, "✅ Server đã sẵn sàng");
 
-        console.log("🚀 Đang khởi chạy Cloudflare Tunnel...");
-        await sendTelegramMessage(GROUP_CHAT_ID, "🔄 Đang thiết lập Cloudflare Tunnel...");
+        console.log("🚀 Đang khởi chạy Tunnel...");
+        await sendTelegramMessage(GROUP_CHAT_ID, "🔄 Đang thiết lập Tunnel...");
 
-        startCloudflaredTunnel(8080);
+        startTunnel(PORT);
     } catch (error) {
         console.error("❌ Lỗi trong quá trình khởi chạy:", error);
         await sendTelegramMessage(GROUP_CHAT_ID, `❌ Lỗi trong quá trình khởi chạy: ${error.message}`);
@@ -136,4 +137,4 @@ bot.onText(/\/getlink/, async (msg) => {
 });
 
 // --------------------- Khởi chạy chương trình ---------------------
-startCodeServerAndCloudflared();
+startServerAndTunnel();
