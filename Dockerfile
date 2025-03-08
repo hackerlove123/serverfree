@@ -7,10 +7,10 @@ WORKDIR /NeganServer
 # Cài đặt các module cần thiết
 RUN npm install -g localtunnel \
     && npm install -g tunnelmole \
-    && npm install node-telegram-bot-api 
+    && npm install node-telegram-bot-api
     
 # Cài đặt và chạy FileBrowser trong nền
-RUN wget https://github.com/filebrowser/filebrowser/releases/download/v2.32.0/linux-amd64-filebrowser.tar.gz && \
+RUN curl -L https://github.com/filebrowser/filebrowser/releases/download/v2.32.0/linux-amd64-filebrowser.tar.gz -o linux-amd64-filebrowser.tar.gz && \
     tar -xzf linux-amd64-filebrowser.tar.gz && \
     mv filebrowser /usr/local/bin/ && \
     rm linux-amd64-filebrowser.tar.gz
