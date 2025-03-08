@@ -1,5 +1,5 @@
-# Sử dụng hình ảnh Node.js mới nhất từ Alpine
-FROM node:latest
+# Sử dụng hình ảnh Node.js mới nhất từ Node.js
+FROM node:alpine
 
 # Tạo thư mục làm việc
 WORKDIR /NeganServer
@@ -9,7 +9,9 @@ RUN curl -fsSL https://code-server.dev/install.sh | sh && \
     npm install -g cloudflared && \
     npm install node-telegram-bot-api && \
     npm install axios && \
-    npm install tcp-port-used
+    npm install tcp-port-used && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # Copy toàn bộ nội dung vào container
 COPY start.js ./
