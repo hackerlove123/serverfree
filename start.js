@@ -15,11 +15,10 @@ let isReady = false; // Trạng thái bot đã sẵn sàng hay chưa
 // --------------------- Hàm gửi tin nhắn ---------------------
 const sendTelegramMessage = async (chatId, message) => {
     try {
-        await bot.sendMessage(chatId, message, { parse_mode: "Markdown" });
-        console.log(`📤 Đã gửi tin nhắn đến ${chatId}: ${message}`);
+        await bot.sendMessage(chatId, message);
+        console.log("Tin nhắn đã được gửi thành công!");
     } catch (error) {
-        console.error(`❌ Lỗi khi gửi tin nhắn đến ${chatId}:`, error);
-        throw error; // Ném lỗi để xử lý tiếp
+        console.error("Lỗi khi gửi tin nhắn:", error);
     }
 };
 
@@ -39,7 +38,7 @@ const waitForCodeServer = () => new Promise((resolve, reject) => {
     // Timeout sau 30 giây
     setTimeout(() => {
         clearInterval(checkServer);
-        reject(new Error("❌ Không thể kết nối đến code-server sau 30 giây."));
+        reject(new Error("Không thể kết nối đến code-server sau 30 giây."));
     }, 30000);
 });
 
@@ -64,11 +63,7 @@ const startCloudflaredTunnel = (port) => {
                     `🎉 **Server đã sẵn sàng!**\n` +
                     `👉 Hãy gọi lệnh /getlink để nhận Public URL.\n` +
                     `🔗 URL sẽ được gửi riêng cho bạn qua tin nhắn cá nhân.`
-                ).then(() => {
-                    console.log("📤 Tin nhắn thông báo đã được gửi thành công!");
-                }).catch((error) => {
-                    console.error("❌ Lỗi khi gửi tin nhắn thông báo:", error);
-                });
+                );
 
                 isReady = true; // Đánh dấu bot đã sẵn sàng
             }
@@ -76,12 +71,10 @@ const startCloudflaredTunnel = (port) => {
     };
 
     cloudflaredProcess.stdout.on("data", (data) => handleOutput(data.toString()));
-    cloudflaredProcess.stderr.on("data", (data) => {
-        console.error(`[cloudflared - ERROR] ${data.toString()}`);
-    });
+    cloudflaredProcess.stderr.on("data", (data) => handleOutput(data.toString()));
     cloudflaredProcess.on("close", (code) => {
-        console.log(`🔴 Cloudflared đã đóng với mã ${code}`);
-        sendTelegramMessage(GROUP_CHAT_ID, `🔴 Cloudflared đã đóng với mã ${code}`);
+        console.log(`Cloudflared đã đóng với mã ${code}`);
+        sendTelegramMessage(GROUP_CHAT_ID, `🔴 CLF đã đóng với mã ${code}`);
     });
 };
 
@@ -89,11 +82,7 @@ const startCloudflaredTunnel = (port) => {
 const startCodeServerAndCloudflared = async () => {
     try {
         console.log("🚀 Đang khởi chạy code-server...");
-        await sendTelegramMessage(
-            GROUP_CHAT_ID,
-            "🔄 **Đang khởi chạy Server...**\n" +
-            "Vui lòng chờ trong giây lát..."
-        );
+        await sendTelegramMessage(GROUP_CHAT_ID, "🔄 Đang khởi chạy Server...");
 
         const codeServerProcess = exec("code-server --bind-addr 0.0.0.0:8080 --auth none");
 
@@ -102,27 +91,16 @@ const startCodeServerAndCloudflared = async () => {
 
         // Đợi code-server khởi động
         await waitForCodeServer();
-        await sendTelegramMessage(
-            GROUP_CHAT_ID,
-            "✅ **Server đã sẵn sàng!**\n" +
-            "Tiếp tục thiết lập Cloudflare Tunnel..."
-        );
+        console.log("✅ Code-server đã sẵn sàng!");
+        await sendTelegramMessage(GROUP_CHAT_ID, "✅ Server đã sẵn sàng");
 
         console.log("🚀 Đang khởi chạy Cloudflare Tunnel...");
-        await sendTelegramMessage(
-            GROUP_CHAT_ID,
-            "🔄 **Đang thiết lập Cloudflare Tunnel...**\n" +
-            "Vui lòng chờ trong giây lát..."
-        );
+        await sendTelegramMessage(GROUP_CHAT_ID, "🔄 Đang thiết lập Cloudflare Tunnel...");
 
         startCloudflaredTunnel(8080);
     } catch (error) {
         console.error("❌ Lỗi trong quá trình khởi chạy:", error);
-        await sendTelegramMessage(
-            GROUP_CHAT_ID,
-            `❌ **Lỗi trong quá trình khởi chạy:**\n` +
-            `${error.message}`
-        );
+        await sendTelegramMessage(GROUP_CHAT_ID, `❌ Lỗi trong quá trình khởi chạy: ${error.message}`);
     }
 };
 
@@ -136,9 +114,7 @@ bot.onText(/\/getlink/, async (msg) => {
         if (publicUrl) {
             await bot.sendMessage(
                 userId,
-                `👉 **Truy cập và sử dụng Server Free tại:**\n` +
-                `🌐 **Public URL:** ${publicUrl}\n` +
-                `🔒 **Lưu ý:** URL chỉ dành riêng cho bạn.`
+                `👉 Truy cập và sử dụng Server Free tại 👇\n🌐 Public URL: ${publicUrl}`
             );
 
             // Sau khi gửi link, dừng bot bằng cách kill tiến trình
@@ -153,8 +129,7 @@ bot.onText(/\/getlink/, async (msg) => {
         } else {
             await bot.sendMessage(
                 userId,
-                "❌ **URL chưa sẵn sàng.**\n" +
-                "Vui lòng thử lại sau hoặc liên hệ quản trị viên."
+                "❌ URL chưa sẵn sàng. Vui lòng thử lại sau."
             );
         }
     }
