@@ -9,9 +9,7 @@ const GROUP_CHAT_ID = -1002423723717; // ID nhóm cụ thể
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 
 // Biến toàn cục
-let publicUrl = null; // Lưu trữ URL từ dịch vụ kết nối
-let isReady = false; // Trạng thái bot đã sẵn sàng hay chưa
-let serverPort = Math.floor(Math.random() * (65535 - 1024)) + 1024; // Port ngẫu nhiên
+let publicUrl = null; // Lưu trữ URL từ Cloudflare Tunnel
 
 // --------------------- Hàm gửi tin nhắn ---------------------
 const sendTelegramMessage = async (chatId, message) => {
@@ -23,101 +21,98 @@ const sendTelegramMessage = async (chatId, message) => {
     }
 };
 
-// --------------------- Hàm kiểm tra server ---------------------
-const waitForServer = (port) => new Promise((resolve, reject) => {
-    console.log("🕒 Đang kiểm tra server...");
+// --------------------- Hàm kiểm tra code-server ---------------------
+const waitForCodeServer = () => new Promise((resolve, reject) => {
+    console.log("🕒 Đang kiểm tra code-server...");
     const checkServer = setInterval(() => {
-        exec(`curl -s http://localhost:${port}`, (error) => {
+        exec("curl -s http://localhost:8080", (error) => {
             if (!error) {
                 clearInterval(checkServer);
-                console.log("✅ Server đã sẵn sàng!");
+                console.log("✅ Code-server đã sẵn sàng!");
                 resolve();
             }
         });
     }, 1000);
 
-    // Timeout sau 60 giây
+    // Timeout sau 30 giây
     setTimeout(() => {
         clearInterval(checkServer);
-        reject(new Error(`❌ Không thể kết nối đến server sau 60 giây.`));
-    }, 60000); // Tăng thời gian chờ lên 60 giây
+        reject(new Error("❌ Không thể kết nối đến code-server sau 30 giây."));
+    }, 30000);
 });
 
-// --------------------- Hàm khởi chạy dịch vụ kết nối ---------------------
-const startConnectionService = (port) => {
-    console.log("🚀 Đang khởi chạy dịch vụ kết nối...");
-    const connectionProcess = spawn("connection-service", ["tunnel", "--url", `http://localhost:${port}`]);
-    let isConnectionReady = false;
+// --------------------- Hàm khởi chạy Cloudflare Tunnel ---------------------
+const startCloudflaredTunnel = (port) => {
+    console.log("🚀 Đang khởi chạy Cloudflare Tunnel...");
+    const cloudflaredProcess = spawn("cloudflared", ["tunnel", "--url", `http://localhost:${port}`]);
+    let isTunnelCreatedLine = false;
 
     const handleOutput = (output) => {
         output.split("\n").forEach((line) => {
-            console.log(`[connection-service] ${line}`);
-            if (line.includes("Your connection is ready! Visit it at")) {
-                isConnectionReady = true;
-            } else if (isConnectionReady) {
+            console.log(`[cloudflared] ${line}`);
+            if (line.includes("Your quick Tunnel has been created! Visit it at")) {
+                isTunnelCreatedLine = true;
+            } else if (isTunnelCreatedLine) {
                 const urlMatch = line.match(/https:\/\/[^"]+/);
                 if (urlMatch) {
-                    let connectionUrl = urlMatch[0].trim().replace('|', '').trim();
-                    publicUrl = `${connectionUrl}/?folder=/NeganServer`; // Lưu URL
+                    let tunnelUrl = urlMatch[0].trim().replace('|', '').trim();
+                    publicUrl = `${tunnelUrl}/?folder=/NeganServer`; // Lưu URL
                     console.log(`🌐 Public URL: ${publicUrl}`);
 
                     // Thông báo hoàn tất
                     sendTelegramMessage(
                         GROUP_CHAT_ID,
                         `🎉 **Server đã sẵn sàng!**\n` +
-                        `👉 Hãy gọi lệnh /getlink để nhận địa chỉ truy cập.\n` +
-                        `🔗 PUBLIC IP sẽ được gửi riêng cho bạn qua tin nhắn cá nhân.`
+                        `👉 Hãy gọi lệnh /getlink để nhận Public URL.\n` +
+                        `🔗 URL sẽ được gửi riêng cho bạn qua tin nhắn cá nhân.`
                     );
-                    isConnectionReady = false; // Đặt lại cờ
-                    isReady = true; // Đánh dấu bot đã sẵn sàng
+                    isTunnelCreatedLine = false; // Đặt lại cờ
                 }
             }
         });
     };
 
-    connectionProcess.stdout.on("data", (data) => handleOutput(data.toString()));
-    connectionProcess.stderr.on("data", (data) => {
-        console.error(`[connection-service - ERROR] ${data.toString()}`);
+    cloudflaredProcess.stdout.on("data", (data) => handleOutput(data.toString()));
+    cloudflaredProcess.stderr.on("data", (data) => {
+        console.error(`[cloudflared - ERROR] ${data.toString()}`);
     });
-    connectionProcess.on("close", (code) => {
-        console.log(`🔴 Dịch vụ kết nối đã đóng với mã ${code}`);
-        sendTelegramMessage(GROUP_CHAT_ID, `🔴 Dịch vụ kết nối đã đóng với mã ${code}`);
+    cloudflaredProcess.on("close", (code) => {
+        console.log(`🔴 Cloudflared đã đóng với mã ${code}`);
+        sendTelegramMessage(GROUP_CHAT_ID, `🔴 Cloudflared đã đóng với mã ${code}`);
     });
 };
 
-// --------------------- Hàm khởi chạy server và dịch vụ kết nối ---------------------
-const startServerAndConnectionService = async () => {
+// --------------------- Hàm khởi chạy code-server và Cloudflare Tunnel ---------------------
+const startCodeServerAndCloudflared = async () => {
     try {
-        console.log("🚀 Đang khởi chạy server...");
+        console.log("🚀 Đang khởi chạy code-server...");
         await sendTelegramMessage(
             GROUP_CHAT_ID,
             "🔄 **Đang khởi chạy Server...**\n" +
             "Vui lòng chờ trong giây lát..."
         );
 
-        const serverProcess = exec(`server --bind-addr 0.0.0.0:${serverPort} --auth none`);
+        const codeServerProcess = exec("code-server --bind-addr 0.0.0.0:8080 --auth none");
 
-        // Hiển thị lỗi từ server để debug
-        serverProcess.stderr.on("data", (data) => {
-            console.error(`❌ Lỗi từ server: ${data.toString()}`);
-        });
+        // Bỏ qua lỗi từ code-server
+        codeServerProcess.stderr.on("data", () => {});
 
-        // Đợi server khởi động
-        await waitForServer(serverPort);
+        // Đợi code-server khởi động
+        await waitForCodeServer();
         await sendTelegramMessage(
             GROUP_CHAT_ID,
             "✅ **Server đã sẵn sàng!**\n" +
-            "Tiếp tục thiết lập dịch vụ kết nối..."
+            "Tiếp tục thiết lập Cloudflare Tunnel..."
         );
 
-        console.log("🚀 Đang khởi chạy dịch vụ kết nối...");
+        console.log("🚀 Đang khởi chạy Cloudflare Tunnel...");
         await sendTelegramMessage(
             GROUP_CHAT_ID,
-            "🔄 **Đang thiết lập dịch vụ kết nối...**\n" +
+            "🔄 **Đang thiết lập Cloudflare Tunnel...**\n" +
             "Vui lòng chờ trong giây lát..."
         );
 
-        startConnectionService(serverPort);
+        startCloudflaredTunnel(8080);
     } catch (error) {
         console.error("❌ Lỗi trong quá trình khởi chạy:", error);
         await sendTelegramMessage(
@@ -133,29 +128,19 @@ bot.onText(/\/getlink/, async (msg) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id;
 
-    // Chỉ xử lý lệnh nếu bot đã sẵn sàng
-    if (isReady && chatId === GROUP_CHAT_ID) {
+    // Kiểm tra xem lệnh được gọi trong nhóm cụ thể hay không
+    if (chatId === GROUP_CHAT_ID) {
         if (publicUrl) {
             await bot.sendMessage(
                 userId,
                 `👉 **Truy cập và sử dụng Server Free tại:**\n` +
-                `🌐 **Địa chỉ truy cập:** ${publicUrl}\n` +
-                `🔒 **Lưu ý:** Địa chỉ này chỉ dành riêng cho bạn.`
+                `🌐 **Public URL:** ${publicUrl}\n` +
+                `🔒 **Lưu ý:** URL chỉ dành riêng cho bạn.`
             );
-
-            // Sau khi gửi link, dừng bot bằng cách kill tiến trình
-            console.log("🛑 Đang dừng bot...");
-            exec("pkill -f -9 start.js", (error) => {
-                if (error) {
-                    console.error(`❌ Lỗi khi dừng bot: ${error.message}`);
-                } else {
-                    console.log("✅ Bot đã dừng thành công.");
-                }
-            });
         } else {
             await bot.sendMessage(
                 userId,
-                "❌ **Địa chỉ truy cập chưa sẵn sàng.**\n" +
+                "❌ **URL chưa sẵn sàng.**\n" +
                 "Vui lòng thử lại sau hoặc liên hệ quản trị viên."
             );
         }
@@ -163,4 +148,4 @@ bot.onText(/\/getlink/, async (msg) => {
 });
 
 // --------------------- Khởi chạy chương trình ---------------------
-startServerAndConnectionService();
+startCodeServerAndCloudflared();
