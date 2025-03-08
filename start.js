@@ -1,6 +1,6 @@
 const { exec, spawn } = require("child_process");
 const TelegramBot = require('node-telegram-bot-api');
-const tcpPortUsed = require('tcp-port-used'); // Module kiểm tra port
+const tcpPortUsed = require('tcp-port-used');
 
 // Cấu hình
 const BOT_TOKEN = "7828296793:AAEw4A7NI8tVrdrcR0TQZXyOpNSPbJmbGUU"; // Thay thế bằng token của bạn
@@ -10,12 +10,12 @@ const GROUP_CHAT_ID = -1002423723717; // Thay thế bằng ID nhóm của bạn
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 
 // Biến toàn cục
-let publicUrl = null; // Lưu trữ URL từ Tunnel
-let isReady = false; // Trạng thái bot đã sẵn sàng hay chưa
-let PORT = null; // Port sẽ được chọn tự động
+let publicUrl = null;
+let isReady = false;
+let PORT = null;
 
 // --------------------- Hàm gửi tin nhắn ---------------------
-const sendTelegramMessage = async (chatId, message) => {
+const sendMessage = async (chatId, message) => {
     try {
         await bot.sendMessage(chatId, message);
         console.log("📤 Tin nhắn đã được gửi thành công!");
@@ -26,13 +26,8 @@ const sendTelegramMessage = async (chatId, message) => {
 
 // --------------------- Hàm kiểm tra port trống ---------------------
 const findAvailablePort = async () => {
-    let port = 1024; // Bắt đầu từ port 1024
-    while (port <= 65535) {
-        const isPortInUse = await tcpPortUsed.check(port, '127.0.0.1');
-        if (!isPortInUse) {
-            return port; // Trả về port trống
-        }
-        port++; // Kiểm tra port tiếp theo
+    for (let port = 1024; port <= 65535; port++) {
+        if (!(await tcpPortUsed.check(port, '127.0.0.1'))) return port;
     }
     throw new Error("❌ Không tìm thấy port trống.");
 };
@@ -40,19 +35,18 @@ const findAvailablePort = async () => {
 // --------------------- Hàm kiểm tra server ---------------------
 const waitForServer = () => new Promise((resolve, reject) => {
     console.log("🕒 Đang kiểm tra server...");
-    const checkServer = setInterval(() => {
+    const interval = setInterval(() => {
         exec(`curl -s http://localhost:${PORT}`, (error) => {
             if (!error) {
-                clearInterval(checkServer);
+                clearInterval(interval);
                 console.log("✅ Server đã sẵn sàng!");
                 resolve();
             }
         });
     }, 1000);
 
-    // Timeout sau 30 giây
     setTimeout(() => {
-        clearInterval(checkServer);
+        clearInterval(interval);
         reject(new Error("❌ Không thể kết nối đến server sau 30 giây."));
     }, 30000);
 });
@@ -63,29 +57,14 @@ const startTunnel = (port) => {
     const tunnelProcess = spawn("tunnelmole", [port.toString()]);
 
     const handleOutput = (output) => {
-        console.log(`[tunnelmole] ${output}`); // Log toàn bộ đầu ra để debug
-
-        // Kiểm tra xem đầu ra có chứa cột "Your Tunnelmole Public URLs" không
+        console.log(`[tunnelmole] ${output}`);
         if (output.includes("Your Tunnelmole Public URLs are below and are accessible internet wide")) {
-            // Tìm dòng chứa URL https://
             const urlLine = output.split("\n").find((line) => line.startsWith("https://"));
             if (urlLine) {
-                // Trích xuất URL từ dòng
-                const urlMatch = urlLine.match(/https:\/\/[^\s]+/);
-                if (urlMatch) {
-                    publicUrl = urlMatch[0].trim(); // Lưu URL
-                    console.log(`🌐 Public URL: ${publicUrl}`);
-
-                    // Gửi thông báo hoàn tất
-                    sendTelegramMessage(
-                        GROUP_CHAT_ID,
-                        `🎉 **Server đã sẵn sàng!**\n` +
-                        `👉 Hãy gọi lệnh /getlink để nhận Public URL.\n` +
-                        `🔗 URL sẽ được gửi riêng cho bạn qua tin nhắn cá nhân.`
-                    );
-
-                    isReady = true; // Đánh dấu bot đã sẵn sàng
-                }
+                publicUrl = urlLine.match(/https:\/\/[^\s]+/)[0].trim();
+                console.log(`🌐 Public URL: ${publicUrl}`);
+                sendMessage(GROUP_CHAT_ID, `🎉 **Server đã sẵn sàng!**\n👉 Hãy gọi lệnh /getlink để nhận Public URL.\n🔗 URL sẽ được gửi riêng cho bạn qua tin nhắn cá nhân.`);
+                isReady = true;
             }
         }
     };
@@ -94,35 +73,31 @@ const startTunnel = (port) => {
     tunnelProcess.stderr.on("data", (data) => handleOutput(data.toString()));
     tunnelProcess.on("close", (code) => {
         console.log(`🔴 Tunnel đã đóng với mã ${code}`);
-        sendTelegramMessage(GROUP_CHAT_ID, `🔴 Tunnel đã đóng với mã ${code}`);
+        sendMessage(GROUP_CHAT_ID, `🔴 Tunnel đã đóng với mã ${code}`);
     });
 };
 
 // --------------------- Hàm khởi chạy server và Tunnel ---------------------
 const startServerAndTunnel = async () => {
     try {
-        // Tìm port trống
         PORT = await findAvailablePort();
         console.log(`🚀 Đang khởi chạy server trên port ${PORT}...`);
-        await sendTelegramMessage(GROUP_CHAT_ID, "🔄 Đang khởi chạy SERVICES...");
+        await sendMessage(GROUP_CHAT_ID, "🔄 Đang khởi chạy SERVICES...");
 
         const serverProcess = spawn("code-server", ["--bind-addr", `0.0.0.0:${PORT}`, "--auth", "none"]);
-
-        // Bỏ qua lỗi từ server
         serverProcess.stderr.on("data", () => {});
 
-        // Đợi server khởi động
         await waitForServer();
         console.log("✅ Server đã sẵn sàng!");
-        await sendTelegramMessage(GROUP_CHAT_ID, "✅ SERVER đã sẵn sàng");
+        await sendMessage(GROUP_CHAT_ID, "✅ SERVER đã sẵn sàng");
 
         console.log("🚀 Đang khởi chạy Tunnel với tunnelmole...");
-        await sendTelegramMessage(GROUP_CHAT_ID, "🔄 Đang thiết lập đường hầm kết nối...");
+        await sendMessage(GROUP_CHAT_ID, "🔄 Đang thiết lập đường hầm kết nối...");
 
         startTunnel(PORT);
     } catch (error) {
         console.error("❌ Lỗi trong quá trình khởi chạy:", error);
-        await sendTelegramMessage(GROUP_CHAT_ID, `❌ Lỗi trong quá trình khởi chạy: ${error.message}`);
+        await sendMessage(GROUP_CHAT_ID, `❌ Lỗi trong quá trình khởi chạy: ${error.message}`);
     }
 };
 
@@ -131,23 +106,14 @@ bot.onText(/\/getlink/, async (msg) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id;
 
-    // Chỉ xử lý lệnh nếu bot đã sẵn sàng
     if (isReady && chatId === GROUP_CHAT_ID) {
         if (publicUrl) {
-            await bot.sendMessage(
-                userId,
-                `👉 Truy cập và sử dụng Server Free tại 👇\n🌐 Public URL: ${publicUrl}`
-            );
-
-            // Dừng bot một cách an toàn
+            await sendMessage(userId, `👉 Truy cập và sử dụng Server Free tại 👇\n🌐 Public URL: ${publicUrl}`);
             console.log("🛑 Đang dừng bot...");
-            bot.stopPolling(); // Dừng polling
+            bot.stopPolling();
             console.log("✅ Bot đã dừng thành công!");
         } else {
-            await bot.sendMessage(
-                userId,
-                "❌ URL chưa sẵn sàng. Vui lòng thử lại sau."
-            );
+            await sendMessage(userId, "❌ URL chưa sẵn sàng. Vui lòng thử lại sau.");
         }
     }
 });
