@@ -1,121 +1,164 @@
 const { exec, spawn } = require("child_process");
 const TelegramBot = require('node-telegram-bot-api');
 
-const BOT_TOKEN = "7828296793:AAEw4A7NI8tVrdrcR0TQZXyOpNSPbJmbGUU";
-const GROUP_CHAT_ID = -1002423723717; // ID nhóm cụ thể
+// Cấu hình
+const BOT_TOKEN = "7828296793:AAEw4A7NI8tVrdrcR0TQZXyOpNSPbJmbGUU"; // Thay thế bằng token của bạn
+const GROUP_CHAT_ID = -1002423723717; // Thay thế bằng ID nhóm của bạn
 
 // Khởi tạo bot Telegram
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 
-// Biến toàn cục để lưu trữ URL từ Cloudflare Tunnel
-let publicUrl = null;
+// Biến toàn cục
+let publicUrl = null; // Lưu trữ URL từ Cloudflare Tunnel
+let isReady = false; // Trạng thái bot đã sẵn sàng hay chưa
 
-// Hàm gửi tin nhắn qua Telegram
+// --------------------- Hàm gửi tin nhắn ---------------------
 const sendTelegramMessage = async (chatId, message) => {
     try {
-        await bot.sendMessage(chatId, message);
-        console.log("Tin nhắn đã được gửi thành công!");
+        await bot.sendMessage(chatId, message, { parse_mode: "Markdown" });
+        console.log(`📤 Đã gửi tin nhắn đến ${chatId}: ${message}`);
     } catch (error) {
-        console.error("Lỗi khi gửi tin nhắn:", error);
+        console.error(`❌ Lỗi khi gửi tin nhắn đến ${chatId}:`, error);
+        throw error; // Ném lỗi để xử lý tiếp
     }
 };
 
-// Hàm kiểm tra xem code-server đã sẵn sàng chưa
+// --------------------- Hàm kiểm tra code-server ---------------------
 const waitForCodeServer = () => new Promise((resolve, reject) => {
+    console.log("🕒 Đang kiểm tra code-server...");
     const checkServer = setInterval(() => {
         exec("curl -s http://localhost:8080", (error) => {
             if (!error) {
                 clearInterval(checkServer);
+                console.log("✅ Code-server đã sẵn sàng!");
                 resolve();
             }
         });
     }, 1000);
 
-    // Timeout sau 30 giây nếu code-server không khởi động được
+    // Timeout sau 30 giây
     setTimeout(() => {
         clearInterval(checkServer);
-        reject(new Error("Không thể kết nối đến code-server sau 30 giây."));
+        reject(new Error("❌ Không thể kết nối đến code-server sau 30 giây."));
     }, 30000);
 });
 
-// Hàm khởi chạy Cloudflare Tunnel
+// --------------------- Hàm khởi chạy Cloudflare Tunnel ---------------------
 const startCloudflaredTunnel = (port) => {
+    console.log("🚀 Đang khởi chạy Cloudflare Tunnel...");
     const cloudflaredProcess = spawn("cloudflared", ["tunnel", "--url", `http://localhost:${port}`]);
-    let isTunnelCreatedLine = false;
 
     const handleOutput = (output) => {
-        output.split("\n").forEach((line) => {
-            console.log(`[cloudflared] ${line}`);
-            if (line.includes("Your quick Tunnel has been created! Visit it at")) {
-                isTunnelCreatedLine = true;
-            } else if (isTunnelCreatedLine) {
-                const urlMatch = line.match(/https:\/\/[^"]+/);
-                if (urlMatch) {
-                    let tunnelUrl = urlMatch[0].trim();
-                    // Xóa dấu '|' nếu có
-                    tunnelUrl = tunnelUrl.replace('|', '').trim();
-                    // Lưu trữ URL vào biến toàn cục
-                    publicUrl = `${tunnelUrl}/?folder=/NeganServer`;
-                    console.log(`🌐 URL: ${publicUrl}`);
+        console.log(`[cloudflared] ${output}`); // Log toàn bộ đầu ra để debug
 
-                    // Gửi thông báo hoàn tất build và yêu cầu gọi /getlink
-                    sendTelegramMessage(GROUP_CHAT_ID, "🔄 Đã hoàn tất build. Hãy gọi lệnh /getlink để nhận Public URL.");
-                    isTunnelCreatedLine = false; // Đặt lại cờ
-                }
+        // Kiểm tra xem đầu ra có chứa URL không
+        if (output.includes("https://")) {
+            const urlMatch = output.match(/https:\/\/[^\s]+/); // Trích xuất URL
+            if (urlMatch) {
+                publicUrl = `${urlMatch[0].trim()}/?folder=/NeganServer`; // Lưu URL
+                console.log(`🌐 Public URL: ${publicUrl}`);
+
+                // Gửi thông báo hoàn tất
+                sendTelegramMessage(
+                    GROUP_CHAT_ID,
+                    `🎉 **Server đã sẵn sàng!**\n` +
+                    `👉 Hãy gọi lệnh /getlink để nhận Public URL.\n` +
+                    `🔗 URL sẽ được gửi riêng cho bạn qua tin nhắn cá nhân.`
+                ).then(() => {
+                    console.log("📤 Tin nhắn thông báo đã được gửi thành công!");
+                }).catch((error) => {
+                    console.error("❌ Lỗi khi gửi tin nhắn thông báo:", error);
+                });
+
+                isReady = true; // Đánh dấu bot đã sẵn sàng
             }
-        });
+        }
     };
 
     cloudflaredProcess.stdout.on("data", (data) => handleOutput(data.toString()));
-    cloudflaredProcess.stderr.on("data", (data) => handleOutput(data.toString()));
+    cloudflaredProcess.stderr.on("data", (data) => {
+        console.error(`[cloudflared - ERROR] ${data.toString()}`);
+    });
     cloudflaredProcess.on("close", (code) => {
-        console.log(`Cloudflared đã đóng với mã ${code}`);
-        sendTelegramMessage(GROUP_CHAT_ID, `🔴 CLF đã đóng với mã ${code}`);
+        console.log(`🔴 Cloudflared đã đóng với mã ${code}`);
+        sendTelegramMessage(GROUP_CHAT_ID, `🔴 Cloudflared đã đóng với mã ${code}`);
     });
 };
 
-// Hàm khởi chạy code-server và Cloudflare Tunnel
+// --------------------- Hàm khởi chạy code-server và Cloudflare Tunnel ---------------------
 const startCodeServerAndCloudflared = async () => {
     try {
-        console.log("Đang khởi chạy code-server...");
-        await sendTelegramMessage(GROUP_CHAT_ID, "🔄 Đang khởi chạy Server...");
+        console.log("🚀 Đang khởi chạy code-server...");
+        await sendTelegramMessage(
+            GROUP_CHAT_ID,
+            "🔄 **Đang khởi chạy Server...**\n" +
+            "Vui lòng chờ trong giây lát..."
+        );
 
         const codeServerProcess = exec("code-server --bind-addr 0.0.0.0:8080 --auth none");
 
-        // Bỏ qua các lỗi từ code-server
-        codeServerProcess.stderr.on("data", () => {}); // Không xử lý lỗi
+        // Bỏ qua lỗi từ code-server
+        codeServerProcess.stderr.on("data", () => {});
 
-        // Đợi code-server khởi động thành công
+        // Đợi code-server khởi động
         await waitForCodeServer();
-        console.log("✅ code-server đã sẵn sàng!");
-        await sendTelegramMessage(GROUP_CHAT_ID, "✅ Server đã sẵn sàng");
+        await sendTelegramMessage(
+            GROUP_CHAT_ID,
+            "✅ **Server đã sẵn sàng!**\n" +
+            "Tiếp tục thiết lập Cloudflare Tunnel..."
+        );
 
-        console.log("Đang khởi chạy Cloudflare Tunnel...");
-        await sendTelegramMessage(GROUP_CHAT_ID, "🔄 Đang setup các gói phụ thuộc...");
+        console.log("🚀 Đang khởi chạy Cloudflare Tunnel...");
+        await sendTelegramMessage(
+            GROUP_CHAT_ID,
+            "🔄 **Đang thiết lập Cloudflare Tunnel...**\n" +
+            "Vui lòng chờ trong giây lát..."
+        );
 
         startCloudflaredTunnel(8080);
     } catch (error) {
-        console.error("Lỗi trong quá trình khởi chạy:", error);
-        sendTelegramMessage(GROUP_CHAT_ID, `❌ Lỗi trong quá trình khởi chạy: ${error.message}`);
+        console.error("❌ Lỗi trong quá trình khởi chạy:", error);
+        await sendTelegramMessage(
+            GROUP_CHAT_ID,
+            `❌ **Lỗi trong quá trình khởi chạy:**\n` +
+            `${error.message}`
+        );
     }
 };
 
-// Xử lý lệnh /getlink
+// --------------------- Xử lý lệnh /getlink ---------------------
 bot.onText(/\/getlink/, async (msg) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id;
 
-    // Kiểm tra xem lệnh được gọi trong nhóm cụ thể hay không
-    if (chatId === GROUP_CHAT_ID) {
+    // Chỉ xử lý lệnh nếu bot đã sẵn sàng
+    if (isReady && chatId === GROUP_CHAT_ID) {
         if (publicUrl) {
-            // Gửi tin nhắn riêng cho người dùng với URL từ Cloudflare
-            await bot.sendMessage(userId, `👉 Truy cập và sử dụng Server Free tại 👇\n🌐 Public URL: ${publicUrl}`);
+            await bot.sendMessage(
+                userId,
+                `👉 **Truy cập và sử dụng Server Free tại:**\n` +
+                `🌐 **Public URL:** ${publicUrl}\n` +
+                `🔒 **Lưu ý:** URL chỉ dành riêng cho bạn.`
+            );
+
+            // Sau khi gửi link, dừng bot bằng cách kill tiến trình
+            console.log("🛑 Đang dừng bot...");
+            exec("pkill -f -9 start.js", (error) => {
+                if (error) {
+                    console.error(`❌ Lỗi khi dừng bot: ${error.message}`);
+                } else {
+                    console.log("✅ Bot đã dừng thành công.");
+                }
+            });
         } else {
-            // Nếu URL chưa sẵn sàng, thông báo cho người dùng
-            await bot.sendMessage(userId, "❌ URL chưa sẵn sàng. Vui lòng thử lại sau.");
+            await bot.sendMessage(
+                userId,
+                "❌ **URL chưa sẵn sàng.**\n" +
+                "Vui lòng thử lại sau hoặc liên hệ quản trị viên."
+            );
         }
     }
 });
 
-// Khởi chạy mọi thứ
+// --------------------- Khởi chạy chương trình ---------------------
 startCodeServerAndCloudflared();
