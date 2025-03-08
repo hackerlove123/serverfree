@@ -50,9 +50,9 @@ const startCloudflaredTunnel = (port) => {
     const handleOutput = (output) => {
         console.log(`[cloudflared] ${output}`); // Log toàn bộ đầu ra để debug
 
-        // Kiểm tra xem đầu ra có chứa URL không
-        if (output.includes("https://")) {
-            const urlMatch = output.match(/https:\/\/[^\s]+/); // Trích xuất URL
+        // Kiểm tra xem đầu ra có chứa dòng thông báo tạo tunnel thành công không
+        if (output.includes("Your quick Tunnel has been created! Visit it at")) {
+            const urlMatch = output.match(/https:\/\/[^\s]+/); // Trích xuất URL từ dòng tiếp theo
             if (urlMatch) {
                 publicUrl = `${urlMatch[0].trim()}/?folder=/NeganServer`; // Lưu URL
                 console.log(`🌐 Public URL: ${publicUrl}`);
