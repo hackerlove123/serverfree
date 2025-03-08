@@ -134,9 +134,10 @@ bot.onText(/\/getlink/, async (msg) => {
                 `👉 Truy cập và sử dụng Server Free tại 👇\n🌐 Public URL: ${publicUrl}`
             );
 
-            // Sau khi gửi link, dừng bot bằng cách kill tiến trình
+            // Dừng bot một cách an toàn
             console.log("🛑 Đang dừng bot...");
-            process.exit(0); // Dừng script mà không ảnh hưởng đến các tiến trình con
+            bot.stopPolling(); // Dừng polling
+            console.log("✅ Bot đã dừng thành công!");
         } else {
             await bot.sendMessage(
                 userId,
