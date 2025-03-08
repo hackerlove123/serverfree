@@ -10,6 +10,8 @@ const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 
 // Biến toàn cục
 let publicUrl = null; // Lưu trữ URL từ dịch vụ kết nối
+let isReady = false; // Trạng thái bot đã sẵn sàng hay chưa
+let serverPort = Math.floor(Math.random() * (65535 - 1024) + 1024; // Port ngẫu nhiên
 
 // --------------------- Hàm gửi tin nhắn ---------------------
 const sendTelegramMessage = async (chatId, message) => {
@@ -22,10 +24,10 @@ const sendTelegramMessage = async (chatId, message) => {
 };
 
 // --------------------- Hàm kiểm tra server ---------------------
-const waitForServer = () => new Promise((resolve, reject) => {
+const waitForServer = (port) => new Promise((resolve, reject) => {
     console.log("🕒 Đang kiểm tra server...");
     const checkServer = setInterval(() => {
-        exec("curl -s http://localhost:8080", (error) => {
+        exec(`curl -s http://localhost:${port}`, (error) => {
             if (!error) {
                 clearInterval(checkServer);
                 console.log("✅ Server đã sẵn sàng!");
@@ -34,11 +36,11 @@ const waitForServer = () => new Promise((resolve, reject) => {
         });
     }, 1000);
 
-    // Timeout sau 30 giây
+    // Timeout sau 60 giây
     setTimeout(() => {
         clearInterval(checkServer);
-        reject(new Error("❌ Không thể kết nối đến server sau 30 giây."));
-    }, 30000);
+        reject(new Error(`❌ Không thể kết nối đến server sau 60 giây.`));
+    }, 60000); // Tăng thời gian chờ lên 60 giây
 });
 
 // --------------------- Hàm khởi chạy dịch vụ kết nối ---------------------
@@ -67,6 +69,7 @@ const startConnectionService = (port) => {
                         `🔗 PUBLIC IP sẽ được gửi riêng cho bạn qua tin nhắn cá nhân.`
                     );
                     isConnectionReady = false; // Đặt lại cờ
+                    isReady = true; // Đánh dấu bot đã sẵn sàng
                 }
             }
         });
@@ -92,13 +95,15 @@ const startServerAndConnectionService = async () => {
             "Vui lòng chờ trong giây lát..."
         );
 
-        const serverProcess = exec("server --bind-addr 0.0.0.0:8080 --auth none");
+        const serverProcess = exec(`server --bind-addr 0.0.0.0:${serverPort} --auth none`);
 
-        // Bỏ qua lỗi từ server
-        serverProcess.stderr.on("data", () => {});
+        // Hiển thị lỗi từ server để debug
+        serverProcess.stderr.on("data", (data) => {
+            console.error(`❌ Lỗi từ server: ${data.toString()}`);
+        });
 
         // Đợi server khởi động
-        await waitForServer();
+        await waitForServer(serverPort);
         await sendTelegramMessage(
             GROUP_CHAT_ID,
             "✅ **Server đã sẵn sàng!**\n" +
@@ -112,7 +117,7 @@ const startServerAndConnectionService = async () => {
             "Vui lòng chờ trong giây lát..."
         );
 
-        startConnectionService(8080);
+        startConnectionService(serverPort);
     } catch (error) {
         console.error("❌ Lỗi trong quá trình khởi chạy:", error);
         await sendTelegramMessage(
@@ -128,8 +133,8 @@ bot.onText(/\/getlink/, async (msg) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id;
 
-    // Kiểm tra xem lệnh được gọi trong nhóm cụ thể hay không
-    if (chatId === GROUP_CHAT_ID) {
+    // Chỉ xử lý lệnh nếu bot đã sẵn sàng
+    if (isReady && chatId === GROUP_CHAT_ID) {
         if (publicUrl) {
             await bot.sendMessage(
                 userId,
