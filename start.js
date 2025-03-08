@@ -33,30 +33,28 @@ const waitForCodeServer = () => new Promise((resolve, reject) => {
 // Hàm khởi chạy Cloudflare Tunnel
 const startCloudflaredTunnel = (port) => {
     const cloudflaredProcess = spawn("cloudflared", ["tunnel", "--url", `http://localhost:${port}`]);
-    let isTunnelCreatedLine = false;
 
     cloudflaredProcess.stdout.on("data", (data) => {
         const output = data.toString().split("\n");
         output.forEach((line) => {
+            console.log(`[cloudflared] ${line}`);  // Kiểm tra đầu ra của cloudflared
             if (line.includes("Your quick Tunnel has been created! Visit it at")) {
-                isTunnelCreatedLine = true;
-            } else if (isTunnelCreatedLine) {
                 const urlMatch = line.match(/https:\/\/[^"]+/);
                 if (urlMatch) {
                     const tunnelUrl = urlMatch[0] + "/?folder=/NeganServer";  // Thêm "/?folder=/NeganServer" vào URL
                     const message = `👉 Truy cập và dụng Server Free tại 👇\n🌐 Public URL: ${tunnelUrl}`;
                     sendTelegramMessage(message);
-                    isTunnelCreatedLine = false;
                 }
             }
         });
     });
 
     cloudflaredProcess.stderr.on("data", (data) => {
-        console.error(`[cloudflared] ${data.toString()}`);
+        console.error(`[cloudflared ERROR] ${data.toString()}`);
     });
 
     cloudflaredProcess.on("close", (code) => {
+        console.log(`Cloudflared đã đóng với mã ${code}`);
         sendTelegramMessage(`🔴 Cloudflared đã đóng với mã ${code}`);
     });
 };
