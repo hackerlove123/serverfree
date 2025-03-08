@@ -7,14 +7,14 @@ const CHAT_ID = "7371969470";
 // Hàm gửi tin nhắn qua Telegram
 const sendTelegramMessage = async (message) => {
     try {
-        await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, { chat_id: CHAT_ID, text: message });
+        await axios.post(https://api.telegram.org/bot${BOT_TOKEN}/sendMessage, { chat_id: CHAT_ID, text: message });
         console.log("Tin nhắn đã được gửi thành công!");
     } catch (error) {
         console.error("Lỗi khi gửi tin nhắn:", error);
     }
 };
 
-// Kiểm tra xem code-server đã sẵn sàng chưa
+// Hàm kiểm tra xem code-server đã sẵn sàng chưa
 const waitForCodeServer = () => new Promise((resolve, reject) => {
     const checkServer = setInterval(() => {
         exec("curl -s http://localhost:8080", (error) => {
@@ -25,61 +25,72 @@ const waitForCodeServer = () => new Promise((resolve, reject) => {
         });
     }, 1000);
 
+    // Timeout sau 30 giây nếu code-server không khởi động được
     setTimeout(() => {
         clearInterval(checkServer);
         reject(new Error("Không thể kết nối đến code-server sau 30 giây."));
     }, 30000);
 });
 
-// Khởi chạy Cloudflare Tunnel
+// Hàm khởi chạy Cloudflare Tunnel
 const startCloudflaredTunnel = (port) => {
-    const cloudflaredProcess = spawn("cloudflared", ["tunnel", "--url", `http://localhost:${port}`]);
+    const cloudflaredProcess = spawn("cloudflared", ["tunnel", "--url", http://localhost:${port}]);
+    let isTunnelCreatedLine = false;
 
-    cloudflaredProcess.stdout.on("data", (data) => {
-        const output = data.toString();
-        console.log(`[cloudflared] ${output}`);
+    const handleOutput = (output) => {
+        output.split("\n").forEach((line) => {
+            console.log([cloudflared] ${line});
+            if (line.includes("Your quick Tunnel has been created! Visit it at")) {
+                isTunnelCreatedLine = true;
+            } else if (isTunnelCreatedLine) {
+                const urlMatch = line.match(/https:\/\/[^"]+/);
+                if (urlMatch) {
+                    let tunnelUrl = urlMatch[0].trim();
+                    // Xóa dấu '|' nếu có
+                    tunnelUrl = tunnelUrl.replace('|', '').trim();
+                    // Chỉnh sửa URL theo yêu cầu
+                    const finalUrl = ${tunnelUrl}/?folder=/NeganServer;
+                    console.log(🌐 URL: ${finalUrl});
+                    sendTelegramMessage(👉 Truy cập và sử dụng Server Free tại 👇\n🌐 Public URL: ${finalUrl});
+                    isTunnelCreatedLine = false;
+                }
+            }
+        });
+    };
 
-        const urlMatch = output.match(/https:\/\/[^"]+/);
-        if (urlMatch) {
-            let tunnelUrl = urlMatch[0].replace('|', '').trim();
-            const finalUrl = `${tunnelUrl}/?folder=/NeganServer`;
-            console.log(`🌐 URL: ${finalUrl}`);
-            sendTelegramMessage(`👉 Truy cập và sử dụng Server Free tại 👇\n🌐 Public URL: ${finalUrl}`);
-        }
-    });
-
-    cloudflaredProcess.stderr.on("data", (data) => console.error(`[cloudflared] Error: ${data.toString()}`));
+    cloudflaredProcess.stdout.on("data", (data) => handleOutput(data.toString()));
+    cloudflaredProcess.stderr.on("data", (data) => handleOutput(data.toString()));
     cloudflaredProcess.on("close", (code) => {
-        console.log(`Cloudflared đã đóng với mã ${code}`);
-        sendTelegramMessage(`🔴 CLF đã đóng với mã ${code}`);
+        console.log(Cloudflared đã đóng với mã ${code});
+        sendTelegramMessage(🔴 CLF đã đóng với mã ${code});
     });
 };
 
-// Khởi chạy code-server và Cloudflare Tunnel
+// Hàm khởi chạy code-server và Cloudflare Tunnel
 const startCodeServerAndCloudflared = async () => {
     try {
         console.log("Đang khởi chạy code-server...");
         await sendTelegramMessage("🔄 Đang khởi chạy Server...");
 
-        exec("code-server --bind-addr 0.0.0.0:8080 --auth none", (err, stdout, stderr) => {
-            if (stderr) {
-                console.error(`Lỗi khi chạy code-server: ${stderr}`);
-            }
-        });
+        const codeServerProcess = exec("code-server --bind-addr 0.0.0.0:8080 --auth none");
 
+        // Bỏ qua các lỗi từ code-server
+        codeServerProcess.stderr.on("data", () => {}); // Không xử lý lỗi
+
+        // Đợi code-server khởi động thành công
         await waitForCodeServer();
         console.log("✅ code-server đã sẵn sàng!");
         await sendTelegramMessage("✅ Server đã sẵn sàng");
 
         console.log("Đang khởi chạy Cloudflare Tunnel...");
-        await sendTelegramMessage("🔄 Setup gói cài đặt phụ thuộc Vui lòng đợi...");
-        startCloudflaredTunnel(8080);
+        await sendTelegramMessage("🔄 Đang setup các gói phụ thuộc...");
 
+        startCloudflaredTunnel(8080);
     } catch (error) {
         console.error("Lỗi trong quá trình khởi chạy:", error);
-        sendTelegramMessage(`❌ Lỗi trong quá trình khởi chạy: ${error.message}`);
+        sendTelegramMessage(❌ Lỗi trong quá trình khởi chạy: ${error.message});
     }
 };
 
-// Khởi chạy
+// Khởi chạy mọi thứ
 startCodeServerAndCloudflared();
