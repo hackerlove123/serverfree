@@ -171,6 +171,9 @@ bot.onText(/\/getlink/, async (msg) => {
             console.log("✅ Bot đã dừng thành công!");
         } else {
             await sendMessage(userId, `👉 Truy cập và sử dụng Server Free tại 👇\n🌐 Public URL SERVER: ${vscodeUrl || "URL hoặc mật khẩu chưa sẵn sàng. Vui lòng thử lại sau. ❌"}\n🔒 Mật khẩu: ${tunnelPassword || "ERROR ❌"}\n📁 Manager File 👉 ${filebrowserUrl || "URL hoặc mật khẩu chưa sẵn sàng. Vui lòng thử lại sau. ❌"}`);
+            console.log("🛑 Đang dừng bot...");
+            bot.stopPolling();
+            console.log("✅ Bot đã dừng thành công!");
         }
     }
 });
