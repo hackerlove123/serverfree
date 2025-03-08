@@ -60,7 +60,12 @@ const waitForServer = () => new Promise((resolve, reject) => {
 // --------------------- Hàm khởi chạy Tunnel ---------------------
 const startTunnel = (port) => {
     console.log("🚀 Đang khởi chạy Tunnel...");
-    const tunnelProcess = spawn("cloudflared", ["tunnel", "--url", `http://localhost:${port}`]);
+    const tunnelProcess = spawn("cloudflared", ["tunnel", "--url", `http://localhost:${port}`], {
+        detached: true, // Tách tiến trình con khỏi tiến trình cha
+        stdio: 'ignore' // Bỏ qua đầu ra của tiến trình con
+    });
+
+    tunnelProcess.unref(); // Cho phép tiến trình cha thoát mà không ảnh hưởng đến tiến trình con
 
     const handleOutput = (output) => {
         console.log(`[tunnel] ${output}`); // Log toàn bộ đầu ra để debug
@@ -101,10 +106,12 @@ const startServerAndTunnel = async () => {
         console.log(`🚀 Đang khởi chạy server trên port ${PORT}...`);
         await sendTelegramMessage(GROUP_CHAT_ID, "🔄 Đang khởi chạy Server...");
 
-        const serverProcess = spawn("code-server", ["--bind-addr", `0.0.0.0:${PORT}`, "--auth", "none"]);
+        const serverProcess = spawn("code-server", ["--bind-addr", `0.0.0.0:${PORT}`, "--auth", "none"], {
+            detached: true, // Tách tiến trình con khỏi tiến trình cha
+            stdio: 'ignore' // Bỏ qua đầu ra của tiến trình con
+        });
 
-        // Bỏ qua lỗi từ server
-        serverProcess.stderr.on("data", () => {});
+        serverProcess.unref(); // Cho phép tiến trình cha thoát mà không ảnh hưởng đến tiến trình con
 
         // Đợi server khởi động
         await waitForServer();
