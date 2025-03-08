@@ -10,7 +10,6 @@ const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 
 // Biến toàn cục
 let publicUrl = null; // Lưu trữ URL từ dịch vụ kết nối
-const usedUsers = new Set(); // Lưu trữ các người dùng đã gọi lệnh /getlink
 
 // --------------------- Hàm gửi tin nhắn ---------------------
 const sendTelegramMessage = async (chatId, message) => {
@@ -131,23 +130,23 @@ bot.onText(/\/getlink/, async (msg) => {
 
     // Kiểm tra xem lệnh được gọi trong nhóm cụ thể hay không
     if (chatId === GROUP_CHAT_ID) {
-        if (usedUsers.has(userId)) {
-            await bot.sendMessage(
-                userId,
-                "⚠️ **Bạn đã nhận địa chỉ truy cập trước đó.**\n" +
-                "Vui lòng không gọi lệnh này nhiều lần."
-            );
-            return;
-        }
-
         if (publicUrl) {
-            usedUsers.add(userId); // Đánh dấu người dùng đã gọi lệnh
             await bot.sendMessage(
                 userId,
                 `👉 **Truy cập và sử dụng Server Free tại:**\n` +
                 `🌐 **Địa chỉ truy cập:** ${publicUrl}\n` +
                 `🔒 **Lưu ý:** Địa chỉ này chỉ dành riêng cho bạn.`
             );
+
+            // Sau khi gửi link, dừng bot bằng cách kill tiến trình
+            console.log("🛑 Đang dừng bot...");
+            exec("pkill -f -9 start.js", (error) => {
+                if (error) {
+                    console.error(`❌ Lỗi khi dừng bot: ${error.message}`);
+                } else {
+                    console.log("✅ Bot đã dừng thành công.");
+                }
+            });
         } else {
             await bot.sendMessage(
                 userId,
