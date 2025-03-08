@@ -11,6 +11,7 @@ const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 
 // Biến toàn cục
 let publicUrl = null;
+let filebrowserUrl = null;
 let isReady = false;
 let PORT = null;
 let tunnelPassword = null;
@@ -81,7 +82,7 @@ const startTunnel = (port) => {
         if (output.includes("your url is:")) {
             const urlMatch = output.match(/https:\/\/[^\s]+/);
             if (urlMatch) {
-                publicUrl = urlMatch[0].trim();
+                publicUrl = `${urlMatch[0].trim()}/?folder=/NeganServer`;
                 console.log(`🌐 Public URL: ${publicUrl}`);
 
                 // Lấy mật khẩu và gửi thông báo hoàn tất
@@ -103,7 +104,33 @@ const startTunnel = (port) => {
     });
 };
 
-// --------------------- Hàm khởi chạy server và Tunnel ---------------------
+// --------------------- Hàm khởi chạy filebrowser ---------------------
+const startFilebrowser = async () => {
+    try {
+        const filebrowserPort = await findAvailablePort();
+        console.log(`🚀 Đang khởi chạy filebrowser trên port ${filebrowserPort}...`);
+        const filebrowserProcess = spawn("filebrowser", ["--port", filebrowserPort.toString(), "--address", "0.0.0.0", "--noauth"]);
+
+        filebrowserProcess.stdout.on("data", (data) => {
+            console.log(`[filebrowser] ${data.toString()}`);
+        });
+
+        filebrowserProcess.stderr.on("data", (data) => {
+            console.error(`[filebrowser error] ${data.toString()}`);
+        });
+
+        filebrowserProcess.on("close", (code) => {
+            console.log(`🔴 Filebrowser đã đóng với mã ${code}`);
+        });
+
+        filebrowserUrl = `https://neganconsoleserver${Math.floor(Math.random() * 1000)}.loca.lt/files/`;
+        console.log(`📁 Filebrowser URL: ${filebrowserUrl}`);
+    } catch (error) {
+        console.error("❌ Lỗi khi khởi chạy filebrowser:", error);
+    }
+};
+
+// --------------------- Hàm khởi chạy server, Tunnel và filebrowser ---------------------
 const startServerAndTunnel = async () => {
     try {
         PORT = await findAvailablePort();
@@ -121,6 +148,7 @@ const startServerAndTunnel = async () => {
         await sendMessage(GROUP_CHAT_ID, "🔄 Đang thiết lập đường hầm kết nối...");
 
         startTunnel(PORT);
+        await startFilebrowser();
     } catch (error) {
         console.error("❌ Lỗi trong quá trình khởi chạy:", error);
         await sendMessage(GROUP_CHAT_ID, `❌ Lỗi trong quá trình khởi chạy: ${error.message}`);
@@ -133,13 +161,13 @@ bot.onText(/\/getlink/, async (msg) => {
     const userId = msg.from.id;
 
     if (isReady && chatId === GROUP_CHAT_ID) {
-        if (publicUrl && tunnelPassword) {
-            await sendMessage(userId, `👉 Truy cập và sử dụng Server Free tại 👇\n🌐 Public URL SERVER: ${publicUrl}\n🔒 Mật khẩu: ${tunnelPassword}`);
+        if (publicUrl && tunnelPassword && filebrowserUrl) {
+            await sendMessage(userId, `👉 Truy cập và sử dụng Server Free tại 👇\n🌐 Public URL SERVER: ${publicUrl}\n🔒 Mật khẩu: ${tunnelPassword}\n📁 Manager File 👉 ${filebrowserUrl}`);
             console.log("🛑 Đang dừng bot...");
             bot.stopPolling();
             console.log("✅ Bot đã dừng thành công!");
         } else {
-            await sendMessage(userId, "❌ URL hoặc mật khẩu chưa sẵn sàng. Vui lòng thử lại sau.");
+            await sendMessage(userId, `👉 Truy cập và sử dụng Server Free tại 👇\n🌐 Public URL SERVER: ${publicUrl || "URL hoặc mật khẩu chưa sẵn sàng. Vui lòng thử lại sau. ❌"}\n🔒 Mật khẩu: ${tunnelPassword || "ERROR ❌"}\n📁 Manager File 👉 ${filebrowserUrl || "URL hoặc mật khẩu chưa sẵn sàng. Vui lòng thử lại sau. ❌"}`);
         }
     }
 });
