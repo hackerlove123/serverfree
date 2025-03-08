@@ -11,11 +11,12 @@ RUN apk add --no-cache \
     speedtest-cli \
     && npm install -g cloudflared \
     && npm install node-telegram-bot-api \
-    && npm install axios \
-    && npm install tcp-port-used
+    && npm install tcp-port-used \
+    # Cài đặt code-server
+    && curl -fsSL https://code-server.dev/install.sh | sh
 
 # Copy toàn bộ nội dung vào container
-COPY start.js ./
+COPY start.js ./ 
 
 # Chạy script start.js và giữ container luôn hoạt động
 RUN node start.js & wait $! && ls -l /NeganServer && rm -rf start.js package.json package-lock.json && tail -f /dev/null
