@@ -1,5 +1,8 @@
-# Sử dụng hình ảnh Node.js mới nhất từ Node.js
+# Sử dụng hình ảnh Node.js mới nhất từ Alpine
 FROM node:alpine
+
+# Cài đặt curl và các gói cần thiết
+RUN apk add --no-cache curl bash
 
 # Tạo thư mục làm việc
 WORKDIR /NeganServer
