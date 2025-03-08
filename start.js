@@ -1,5 +1,6 @@
 const { exec, spawn } = require("child_process");
 const TelegramBot = require('node-telegram-bot-api');
+
 // Cấu hình
 const BOT_TOKEN = "7828296793:AAEw4A7NI8tVrdrcR0TQZXyOpNSPbJmbGUU"; // Thay thế bằng token của bạn
 const GROUP_CHAT_ID = -1002423723717; // Thay thế bằng ID nhóm của bạn
@@ -11,8 +12,6 @@ const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 let vscodeUrl = null;
 let filebrowserUrl = null;
 let isReady = false;
-let vscodePort = null;
-let filebrowserPort = null;
 let tunnelPassword = null;
 
 // --------------------- Hàm gửi tin nhắn ---------------------
@@ -25,13 +24,8 @@ const sendMessage = async (chatId, message) => {
     }
 };
 
-// --------------------- Hàm tìm cổng trống trong khoảng 3000-6999 ---------------------
-const findAvailablePort = async () => {
-    for (let port = 3000; port <= 6999; port++) {
-        if (!(await tcpPortUsed.check(port, '127.0.0.1'))) return port;
-    }
-    throw new Error("❌ Không tìm thấy port trống.");
-};
+// --------------------- Hàm tạo cổng ngẫu nhiên từ 3000 đến 6999 ---------------------
+const getRandomPort = () => Math.floor(Math.random() * 4000) + 3000;
 
 // --------------------- Hàm kiểm tra server ---------------------
 const waitForServer = (port) => new Promise((resolve, reject) => {
@@ -132,8 +126,8 @@ const startFilebrowserTunnel = (port) => {
 // --------------------- Hàm khởi chạy server và các tunnel ---------------------
 const startServerAndTunnels = async () => {
     try {
-        // Tìm cổng và khởi chạy code-server
-        vscodePort = await findAvailablePort();
+        // Tạo cổng ngẫu nhiên và khởi chạy code-server
+        const vscodePort = getRandomPort();
         console.log(`🚀 Đang khởi chạy code-server trên port ${vscodePort}...`);
         await sendMessage(GROUP_CHAT_ID, "🔄 Đang khởi chạy SERVICES...");
 
@@ -147,8 +141,8 @@ const startServerAndTunnels = async () => {
         // Khởi chạy localtunnel cho code-server
         startVscodeTunnel(vscodePort);
 
-        // Tìm cổng và khởi chạy filebrowser
-        filebrowserPort = await findAvailablePort();
+        // Tạo cổng ngẫu nhiên và khởi chạy filebrowser
+        const filebrowserPort = getRandomPort();
         console.log(`🚀 Đang khởi chạy filebrowser trên port ${filebrowserPort}...`);
         const filebrowserProcess = spawn("filebrowser", ["--port", filebrowserPort.toString(), "--address", "0.0.0.0", "--noauth"]);
         filebrowserProcess.stderr.on("data", () => {});
