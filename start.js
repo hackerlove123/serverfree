@@ -11,7 +11,7 @@ const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 // Biến toàn cục
 let publicUrl = null; // Lưu trữ URL từ dịch vụ kết nối
 let isReady = false; // Trạng thái bot đã sẵn sàng hay chưa
-let serverPort = Math.floor(Math.random() * (65535 - 1024) + 1024; // Port ngẫu nhiên
+let serverPort = Math.floor(Math.random() * (65535 - 1024)) + 1024; // Port ngẫu nhiên
 
 // --------------------- Hàm gửi tin nhắn ---------------------
 const sendTelegramMessage = async (chatId, message) => {
