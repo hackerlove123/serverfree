@@ -69,8 +69,12 @@ const startTunnel = (port) => {
                 if (urlMatch) {
                     publicUrl = urlMatch[0].trim();
                     console.log(`🌐 Public URL: ${publicUrl}`);
-                    sendMessage(GROUP_CHAT_ID, `🎉 **Server đã sẵn sàng!**\n👉 Hãy gọi lệnh /getlink để nhận Public URL.\n🔗 URL sẽ được gửi riêng cho bạn qua tin nhắn cá nhân.`);
-                    isReady = true;
+
+                    // Thêm thời gian chờ để đảm bảo kết nối ổn định
+                    setTimeout(() => {
+                        sendMessage(GROUP_CHAT_ID, `🎉 **Server đã sẵn sàng!**\n👉 Hãy gọi lệnh /getlink để nhận Public URL.\n🔗 URL sẽ được gửi riêng cho bạn qua tin nhắn cá nhân.`);
+                        isReady = true;
+                    }, 5000); // Chờ 5 giây trước khi gửi thông báo
                 }
             }
         }
@@ -91,7 +95,7 @@ const startServerAndTunnel = async () => {
         console.log(`🚀 Đang khởi chạy server trên port ${PORT}...`);
         await sendMessage(GROUP_CHAT_ID, "🔄 Đang khởi chạy SERVICES...");
 
-        const serverProcess = spawn("code-server", ["--bind-addr", `0.0.0.0:${PORT}`, "--auth", "none"]);
+        const serverProcess = spawn("code-server", ["--bind-addr", `0.0.0.0:${PORT}`, "--auth", "none", "--disable-telemetry"]);
         serverProcess.stderr.on("data", () => {});
 
         await waitForServer();
