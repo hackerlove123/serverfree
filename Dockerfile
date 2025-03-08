@@ -5,8 +5,7 @@ FROM node:latest
 WORKDIR /NeganServer
 
 # Cài đặt các module cần thiết
-RUN npm install -g tunnelmole \
-    && npm install tunnelmole \
+RUN npm install -g localtunnel \
     && npm install node-telegram-bot-api \
     && npm install tcp-port-used
 
