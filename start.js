@@ -18,7 +18,7 @@ let tunnelPassword = null;
 const sendMessage = async (chatId, message) => {
     try {
         await bot.sendMessage(chatId, message);
-        console.log(`📤 [${chatId}] Tin nhắn đã được gửi thành công: ${message}`);
+        console.log(`📤 [${chatId}] Tin nhắn đã được gửi: ${message}`);
     } catch (error) {
         console.error(`❌ [${chatId}] Lỗi khi gửi tin nhắn:`, error);
     }
@@ -29,12 +29,12 @@ const getRandomPort = () => Math.floor(Math.random() * 4000) + 3000;
 
 // --------------------- Hàm kiểm tra server ---------------------
 const waitForServer = (port, serviceName) => new Promise((resolve, reject) => {
-    console.log(`🕒 [${serviceName}] Đang kiểm tra server trên port ${port}...`);
+    console.log(`🕒 [${serviceName}] Đang kiểm tra port ${port}...`);
     const interval = setInterval(() => {
         exec(`curl -s http://localhost:${port}`, (error) => {
             if (!error) {
                 clearInterval(interval);
-                console.log(`✅ [${serviceName}] Server trên port ${port} đã sẵn sàng!`);
+                console.log(`✅ [${serviceName}] Port ${port} đã sẵn sàng!`);
                 resolve();
             }
         });
@@ -42,7 +42,7 @@ const waitForServer = (port, serviceName) => new Promise((resolve, reject) => {
 
     setTimeout(() => {
         clearInterval(interval);
-        reject(new Error(`❌ [${serviceName}] Không thể kết nối đến server trên port ${port} sau 30 giây.`));
+        reject(new Error(`❌ [${serviceName}] Không thể kết nối đến port ${port} sau 30 giây.`));
     }, 30000);
 });
 
