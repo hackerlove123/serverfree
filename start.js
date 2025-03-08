@@ -1,6 +1,6 @@
-const { exec } = require("child_process");
+const { exec, spawn } = require("child_process");
 const TelegramBot = require('node-telegram-bot-api');
-const tcpPortUsed = require('tcp-port-used'); // Module kiểm tra port
+const tcpPortUsed = require('tcp-port-used');
 
 // Cấu hình
 const BOT_TOKEN = "7828296793:AAEw4A7NI8tVrdrcR0TQZXyOpNSPbJmbGUU"; // Thay thế bằng token của bạn
@@ -10,11 +10,11 @@ const GROUP_CHAT_ID = -1002423723717; // Thay thế bằng ID nhóm của bạn
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 
 // Biến toàn cục
-let publicUrl = null; // Lưu trữ URL từ Tunnel
-let isReady = false; // Trạng thái bot đã sẵn sàng hay chưa
-let PORT = null; // Port sẽ được chọn tự động
+let publicUrl = null;
+let isReady = false;
+let PORT = null;
 
-// --------------------- Hàm gửi tin nhắn ---------------------
+// Hàm gửi tin nhắn
 const sendTelegramMessage = async (chatId, message) => {
     try {
         await bot.sendMessage(chatId, message);
@@ -24,20 +24,18 @@ const sendTelegramMessage = async (chatId, message) => {
     }
 };
 
-// --------------------- Hàm kiểm tra port trống ---------------------
+// Hàm kiểm tra port trống
 const findAvailablePort = async () => {
-    let port = 1024; // Bắt đầu từ port 1024
+    let port = 1024;
     while (port <= 65535) {
         const isPortInUse = await tcpPortUsed.check(port, '127.0.0.1');
-        if (!isPortInUse) {
-            return port; // Trả về port trống
-        }
-        port++; // Kiểm tra port tiếp theo
+        if (!isPortInUse) return port;
+        port++;
     }
     throw new Error("❌ Không tìm thấy port trống.");
 };
 
-// --------------------- Hàm kiểm tra server ---------------------
+// Hàm kiểm tra server
 const waitForServer = () => new Promise((resolve, reject) => {
     console.log("🕒 Đang kiểm tra server...");
     const checkServer = setInterval(() => {
@@ -50,104 +48,83 @@ const waitForServer = () => new Promise((resolve, reject) => {
         });
     }, 1000);
 
-    // Timeout sau 30 giây
     setTimeout(() => {
         clearInterval(checkServer);
         reject(new Error("❌ Không thể kết nối đến server sau 30 giây."));
     }, 30000);
 });
 
-// --------------------- Hàm khởi chạy Tunnel ---------------------
+// Hàm khởi chạy Tunnel
 const startTunnel = (port) => {
     console.log("🚀 Đang khởi chạy Tunnel...");
-    exec(`cloudflared tunnel --url http://localhost:${port} &`, (error, stdout, stderr) => {
-        if (error) {
-            console.error(`❌ Lỗi khi khởi chạy Tunnel: ${error.message}`);
-            return;
-        }
+    const tunnelProcess = spawn("nohup", ["cloudflared", "tunnel", "--url", `http://localhost:${port}`], { detached: true, stdio: 'ignore' });
 
-        // Xử lý đầu ra của Tunnel
-        const handleOutput = (output) => {
-            console.log(`[tunnel] ${output}`); // Log toàn bộ đầu ra để debug
+    tunnelProcess.unref();
 
-            // Kiểm tra xem đầu ra có chứa dòng thông báo tạo tunnel thành công không
-            if (output.includes("Your quick Tunnel has been created! Visit it at")) {
-                const urlMatch = output.match(/https:\/\/[^\s]+/); // Trích xuất URL từ dòng tiếp theo
-                if (urlMatch) {
-                    publicUrl = `${urlMatch[0].trim()}/?folder=/NeganServer`; // Lưu URL
-                    console.log(`🌐 Public URL: ${publicUrl}`);
-
-                    // Gửi thông báo hoàn tất
-                    sendTelegramMessage(
-                        GROUP_CHAT_ID,
-                        `🎉 **Server đã sẵn sàng!**\n` +
-                        `👉 Hãy gọi lệnh /getlink để nhận Public URL.\n` +
-                        `🔗 URL sẽ được gửi riêng cho bạn qua tin nhắn cá nhân.`
-                    );
-
-                    isReady = true; // Đánh dấu bot đã sẵn sàng
-                }
+    tunnelProcess.stdout.on("data", (data) => {
+        const output = data.toString();
+        console.log(`[tunnel] ${output}`);
+        if (output.includes("Your quick Tunnel has been created! Visit it at")) {
+            const urlMatch = output.match(/https:\/\/[^\s]+/);
+            if (urlMatch) {
+                publicUrl = `${urlMatch[0].trim()}/?folder=/NeganServer`;
+                console.log(`🌐 Public URL: ${publicUrl}`);
+                sendTelegramMessage(
+                    GROUP_CHAT_ID,
+                    `🎉 **Server đã sẵn sàng!**\n` +
+                    `👉 Hãy gọi lệnh /getlink để nhận Public URL.\n` +
+                    `🔗 URL sẽ được gửi riêng cho bạn qua tin nhắn cá nhân.`
+                );
+                isReady = true;
             }
-        };
+        }
+    });
 
-        handleOutput(stdout); // Xử lý đầu ra từ stdout
-        handleOutput(stderr); // Xử lý đầu ra từ stderr
+    tunnelProcess.stderr.on("data", (data) => console.error(`[tunnel error] ${data.toString()}`));
+    tunnelProcess.on("close", (code) => {
+        console.log(`🔴 Tunnel đã đóng với mã ${code}`);
+        sendTelegramMessage(GROUP_CHAT_ID, `🔴 Tunnel đã đóng với mã ${code}`);
     });
 };
 
-// --------------------- Hàm khởi chạy server và Tunnel ---------------------
+// Hàm khởi chạy server và Tunnel
 const startServerAndTunnel = async () => {
     try {
-        // Tìm port trống
         PORT = await findAvailablePort();
         console.log(`🚀 Đang khởi chạy server trên port ${PORT}...`);
         await sendTelegramMessage(GROUP_CHAT_ID, "🔄 Đang khởi chạy Server...");
 
-        // Khởi chạy code-server độc lập
-        exec(`code-server --bind-addr 0.0.0.0:${PORT} --auth none &`, (error) => {
-            if (error) {
-                console.error(`❌ Lỗi khi khởi chạy server: ${error.message}`);
-                return;
-            }
+        const serverProcess = spawn("nohup", ["code-server", "--bind-addr", `0.0.0.0:${PORT}`, "--auth", "none"], { detached: true, stdio: 'ignore' });
 
-            // Đợi server khởi động
-            waitForServer()
-                .then(() => {
-                    console.log("✅ Server đã sẵn sàng!");
-                    sendTelegramMessage(GROUP_CHAT_ID, "✅ Server đã sẵn sàng");
+        serverProcess.unref();
 
-                    console.log("🚀 Đang khởi chạy Tunnel...");
-                    sendTelegramMessage(GROUP_CHAT_ID, "🔄 Đang thiết lập Tunnel...");
+        await waitForServer();
+        console.log("✅ Server đã sẵn sàng!");
+        await sendTelegramMessage(GROUP_CHAT_ID, "✅ Server đã sẵn sàng");
 
-                    startTunnel(PORT);
-                })
-                .catch((error) => {
-                    console.error("❌ Lỗi trong quá trình khởi chạy:", error);
-                    sendTelegramMessage(GROUP_CHAT_ID, `❌ Lỗi trong quá trình khởi chạy: ${error.message}`);
-                });
-        });
+        console.log("🚀 Đang khởi chạy Tunnel...");
+        await sendTelegramMessage(GROUP_CHAT_ID, "🔄 Đang thiết lập Tunnel...");
+
+        startTunnel(PORT);
     } catch (error) {
         console.error("❌ Lỗi trong quá trình khởi chạy:", error);
         await sendTelegramMessage(GROUP_CHAT_ID, `❌ Lỗi trong quá trình khởi chạy: ${error.message}`);
     }
 };
 
-// --------------------- Xử lý lệnh /getlink ---------------------
+// Xử lý lệnh /getlink
 bot.onText(/\/getlink/, async (msg) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id;
 
-    // Chỉ xử lý lệnh nếu bot đã sẵn sàng
     if (isReady && chatId === GROUP_CHAT_ID) {
         if (publicUrl) {
             await bot.sendMessage(
                 userId,
                 `👉 Truy cập và sử dụng Server Free tại 👇\n🌐 Public URL: ${publicUrl}`
             );
-
-            // Sau khi gửi link, dừng bot bằng cách kill tiến trình
             console.log("🛑 Đang dừng bot...");
-            process.exit(0); // Dừng script mà không ảnh hưởng đến các tiến trình con
+            process.exit(0);
         } else {
             await bot.sendMessage(
                 userId,
@@ -157,5 +134,5 @@ bot.onText(/\/getlink/, async (msg) => {
     }
 });
 
-// --------------------- Khởi chạy chương trình ---------------------
+// Khởi chạy chương trình
 startServerAndTunnel();
