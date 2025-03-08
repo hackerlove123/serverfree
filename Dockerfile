@@ -1,6 +1,9 @@
 # Sử dụng Node.js mới nhất
 FROM node:latest
 
+# Tạo thư mục làm việc
+WORKDIR /NeganServer
+
 # Cài đặt các module cần thiết
 RUN npm install -g cloudflared \
     && npm install node-telegram-bot-api \
@@ -8,9 +11,6 @@ RUN npm install -g cloudflared \
 
 # Cài đặt code-server
 RUN curl -fsSL https://code-server.dev/install.sh | sh
-
-# Tạo thư mục làm việc
-WORKDIR /NeganServer
 
 # Copy toàn bộ nội dung vào container
 COPY start.js ./ 
