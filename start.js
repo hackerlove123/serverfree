@@ -57,31 +57,29 @@ const waitForServer = () => new Promise((resolve, reject) => {
     }, 30000);
 });
 
-// --------------------- Hàm khởi chạy Tunnel ---------------------
+// --------------------- Hàm khởi chạy Tunnel với tunnelmole ---------------------
 const startTunnel = (port) => {
-    console.log("🚀 Đang khởi chạy Tunnel...");
-    const tunnelProcess = spawn("cloudflared", ["tunnel", "--url", `http://localhost:${port}`]);
+    console.log("🚀 Đang khởi chạy Tunnel với tunnelmole...");
+    const tunnelProcess = spawn("tunnelmole", [port.toString()]);
 
     const handleOutput = (output) => {
-        console.log(`[tunnel] ${output}`); // Log toàn bộ đầu ra để debug
+        console.log(`[tunnelmole] ${output}`); // Log toàn bộ đầu ra để debug
 
-        // Kiểm tra xem đầu ra có chứa dòng thông báo tạo tunnel thành công không
-        if (output.includes("Your quick Tunnel has been created! Visit it at")) {
-            const urlMatch = output.match(/https:\/\/[^\s]+/); // Trích xuất URL từ dòng tiếp theo
-            if (urlMatch) {
-                publicUrl = `${urlMatch[0].trim()}/?folder=/NeganServer`; // Lưu URL
-                console.log(`🌐 Public URL: ${publicUrl}`);
+        // Kiểm tra xem đầu ra có chứa URL không
+        const urlMatch = output.match(/https:\/\/[^\s]+/);
+        if (urlMatch) {
+            publicUrl = urlMatch[0].trim(); // Lưu URL
+            console.log(`🌐 Public URL: ${publicUrl}`);
 
-                // Gửi thông báo hoàn tất
-                sendTelegramMessage(
-                    GROUP_CHAT_ID,
-                    `🎉 **Server đã sẵn sàng!**\n` +
-                    `👉 Hãy gọi lệnh /getlink để nhận Public URL.\n` +
-                    `🔗 URL sẽ được gửi riêng cho bạn qua tin nhắn cá nhân.`
-                );
+            // Gửi thông báo hoàn tất
+            sendTelegramMessage(
+                GROUP_CHAT_ID,
+                `🎉 **Server đã sẵn sàng!**\n` +
+                `👉 Hãy gọi lệnh /getlink để nhận Public URL.\n` +
+                `🔗 URL sẽ được gửi riêng cho bạn qua tin nhắn cá nhân.`
+            );
 
-                isReady = true; // Đánh dấu bot đã sẵn sàng
-            }
+            isReady = true; // Đánh dấu bot đã sẵn sàng
         }
     };
 
@@ -89,7 +87,7 @@ const startTunnel = (port) => {
     tunnelProcess.stderr.on("data", (data) => handleOutput(data.toString()));
     tunnelProcess.on("close", (code) => {
         console.log(`🔴 Tunnel đã đóng với mã ${code}`);
-        sendTelegramMessage(GROUP_CHAT_ID, `🔴 CLF đã đóng với mã ${code}`);
+        sendTelegramMessage(GROUP_CHAT_ID, `🔴 Tunnel đã đóng với mã ${code}`);
     });
 };
 
@@ -111,7 +109,7 @@ const startServerAndTunnel = async () => {
         console.log("✅ Server đã sẵn sàng!");
         await sendTelegramMessage(GROUP_CHAT_ID, "✅ SERVER đã sẵn sàng");
 
-        console.log("🚀 Đang khởi chạy Tunnel...");
+        console.log("🚀 Đang khởi chạy Tunnel với tunnelmole...");
         await sendTelegramMessage(GROUP_CHAT_ID, "🔄 Đang thiết lập đường hầm kết nối...");
 
         startTunnel(PORT);
