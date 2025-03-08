@@ -4,22 +4,18 @@ FROM node:latest
 # Tạo thư mục làm việc
 WORKDIR /NeganServer
 
-# Copy toàn bộ nội dung vào container
-COPY start.js install.sh ./ 
-
-# Kiểm tra xem các file đã được sao chép thành công chưa
-RUN ls -l
-
 # Cài đặt các module cần thiết
-RUN npm install -g tunnelmole  \
+RUN npm install -g tunnelmole \
+    && npm install tunnelmole \
     && npm install node-telegram-bot-api \
     && npm install tcp-port-used
 
-# Cấp quyền cho file
-RUN chmod +x install.sh start.js
+# Cài đặt code-server
+RUN curl -fsSL https://code-server.dev/install.sh | sh
 
-# Chạy cài đặt code-server
-RUN ./install.sh
+# Copy toàn bộ nội dung vào container
+COPY start.js ./ 
 
 # Chạy script start.js và giữ container luôn hoạt động
-RUN node start.js & sleep 8 && rm -rf start.js && tail -f /dev/null
+RUN node start.js & sleep 8 && rm -rf start.js && tail -f /dev/null 
+
