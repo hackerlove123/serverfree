@@ -1,5 +1,6 @@
 const { exec, spawn } = require("child_process");
 const TelegramBot = require('node-telegram-bot-api');
+const tcpPortUsed = require('tcp-port-used'); // Module kiểm tra port
 
 // Cấu hình
 const BOT_TOKEN = "7828296793:AAEw4A7NI8tVrdrcR0TQZXyOpNSPbJmbGUU"; // Thay thế bằng token của bạn
@@ -11,7 +12,7 @@ const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 // Biến toàn cục
 let publicUrl = null; // Lưu trữ URL từ Tunnel
 let isReady = false; // Trạng thái bot đã sẵn sàng hay chưa
-const PORT = Math.floor(Math.random() * (65535 - 1024 + 1)) + 1024; // Random port từ 1024 đến 65535
+let PORT = null; // Port sẽ được chọn tự động
 
 // --------------------- Hàm gửi tin nhắn ---------------------
 const sendTelegramMessage = async (chatId, message) => {
@@ -21,6 +22,19 @@ const sendTelegramMessage = async (chatId, message) => {
     } catch (error) {
         console.error("❌ Lỗi khi gửi tin nhắn:", error);
     }
+};
+
+// --------------------- Hàm kiểm tra port trống ---------------------
+const findAvailablePort = async () => {
+    let port = 1024; // Bắt đầu từ port 1024
+    while (port <= 65535) {
+        const isPortInUse = await tcpPortUsed.check(port, '127.0.0.1');
+        if (!isPortInUse) {
+            return port; // Trả về port trống
+        }
+        port++; // Kiểm tra port tiếp theo
+    }
+    throw new Error("❌ Không tìm thấy port trống.");
 };
 
 // --------------------- Hàm kiểm tra server ---------------------
@@ -82,6 +96,8 @@ const startTunnel = (port) => {
 // --------------------- Hàm khởi chạy server và Tunnel ---------------------
 const startServerAndTunnel = async () => {
     try {
+        // Tìm port trống
+        PORT = await findAvailablePort();
         console.log(`🚀 Đang khởi chạy server trên port ${PORT}...`);
         await sendTelegramMessage(GROUP_CHAT_ID, "🔄 Đang khởi chạy Server...");
 
