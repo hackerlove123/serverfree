@@ -18,9 +18,9 @@ let tunnelPassword = null;
 const sendMessage = async (chatId, message) => {
     try {
         await bot.sendMessage(chatId, message);
-        console.log("📤 Tin nhắn đã được gửi thành công!");
+        console.log(`📤 [${chatId}] Tin nhắn đã được gửi thành công: ${message}`);
     } catch (error) {
-        console.error("❌ Lỗi khi gửi tin nhắn:", error);
+        console.error(`❌ [${chatId}] Lỗi khi gửi tin nhắn:`, error);
     }
 };
 
@@ -28,13 +28,13 @@ const sendMessage = async (chatId, message) => {
 const getRandomPort = () => Math.floor(Math.random() * 4000) + 3000;
 
 // --------------------- Hàm kiểm tra server ---------------------
-const waitForServer = (port) => new Promise((resolve, reject) => {
-    console.log(`🕒 Đang kiểm tra server trên port ${port}...`);
+const waitForServer = (port, serviceName) => new Promise((resolve, reject) => {
+    console.log(`🕒 [${serviceName}] Đang kiểm tra server trên port ${port}...`);
     const interval = setInterval(() => {
         exec(`curl -s http://localhost:${port}`, (error) => {
             if (!error) {
                 clearInterval(interval);
-                console.log(`✅ Server trên port ${port} đã sẵn sàng!`);
+                console.log(`✅ [${serviceName}] Server trên port ${port} đã sẵn sàng!`);
                 resolve();
             }
         });
@@ -42,20 +42,20 @@ const waitForServer = (port) => new Promise((resolve, reject) => {
 
     setTimeout(() => {
         clearInterval(interval);
-        reject(new Error(`❌ Không thể kết nối đến server trên port ${port} sau 30 giây.`));
+        reject(new Error(`❌ [${serviceName}] Không thể kết nối đến server trên port ${port} sau 30 giây.`));
     }, 30000);
 });
 
 // --------------------- Hàm lấy mật khẩu từ localtunnel ---------------------
 const getTunnelPassword = () => new Promise((resolve, reject) => {
-    console.log("🔐 Đang lấy mật khẩu từ localtunnel...");
+    console.log("🔐 [localtunnel] Đang lấy mật khẩu...");
     exec("curl https://loca.lt/mytunnelpassword", (error, stdout, stderr) => {
         if (error) {
-            console.error("❌ Lỗi khi lấy mật khẩu:", stderr);
+            console.error("❌ [localtunnel] Lỗi khi lấy mật khẩu:", stderr);
             reject(error);
         } else {
             tunnelPassword = stdout.trim();
-            console.log(`🔐 Mật khẩu: ${tunnelPassword}`);
+            console.log(`🔐 [localtunnel] Mật khẩu: ${tunnelPassword}`);
             resolve();
         }
     });
@@ -63,7 +63,7 @@ const getTunnelPassword = () => new Promise((resolve, reject) => {
 
 // --------------------- Hàm khởi chạy localtunnel cho code-server ---------------------
 const startVscodeTunnel = (port) => {
-    console.log("🚀 Đang khởi chạy localtunnel cho code-server...");
+    console.log("🚀 [localtunnel] Đang khởi chạy cho code-server...");
     const randomSuffix = Math.floor(Math.random() * 1000); // Tạo số ngẫu nhiên từ 0 đến 999
     const subdomain = `neganconsoleserver${randomSuffix}`;
     const tunnelProcess = spawn("lt", ["--port", port.toString(), "--subdomain", subdomain]);
@@ -76,14 +76,14 @@ const startVscodeTunnel = (port) => {
             const urlMatch = output.match(/https:\/\/[^\s]+/);
             if (urlMatch) {
                 vscodeUrl = `${urlMatch[0].trim()}/?folder=/NeganServer`;
-                console.log(`🌐 Public URL (code-server): ${vscodeUrl}`);
+                console.log(`🌐 [localtunnel] Public URL (code-server): ${vscodeUrl}`);
 
                 // Lấy mật khẩu và gửi thông báo hoàn tất
                 getTunnelPassword().then(() => {
                     sendMessage(GROUP_CHAT_ID, `🎉 **Server đã sẵn sàng!**\n👉 Hãy gọi lệnh /getlink để nhận Public URL.\n🔗 URL sẽ được gửi riêng cho bạn qua tin nhắn cá nhân.`);
                     isReady = true;
                 }).catch((error) => {
-                    console.error("❌ Lỗi khi lấy mật khẩu:", error);
+                    console.error("❌ [localtunnel] Lỗi khi lấy mật khẩu:", error);
                 });
             }
         }
@@ -92,14 +92,14 @@ const startVscodeTunnel = (port) => {
     tunnelProcess.stdout.on("data", (data) => handleOutput(data.toString()));
     tunnelProcess.stderr.on("data", (data) => handleOutput(data.toString()));
     tunnelProcess.on("close", (code) => {
-        console.log(`🔴 Tunnel (code-server) đã đóng với mã ${code}`);
-        sendMessage(GROUP_CHAT_ID, `🔴 Tunnel (code-server) đã đóng với mã ${code}`);
+        console.log(`🔴 [localtunnel] Đã đóng với mã ${code}`);
+        sendMessage(GROUP_CHAT_ID, `🔴 [localtunnel] Đã đóng với mã ${code}`);
     });
 };
 
 // --------------------- Hàm khởi chạy tunnelmole cho filebrowser ---------------------
 const startFilebrowserTunnel = (port) => {
-    console.log("🚀 Đang khởi chạy tunnelmole cho filebrowser...");
+    console.log("🚀 [tunnelmole] Đang khởi chạy cho filebrowser...");
     const tunnelProcess = spawn("tunnelmole", [port.toString()]);
 
     const handleOutput = (output) => {
@@ -109,8 +109,8 @@ const startFilebrowserTunnel = (port) => {
         if (output.includes("⟶")) {
             const urlMatch = output.match(/https:\/\/[^\s]+/);
             if (urlMatch) {
-                filebrowserUrl = urlMatch[0].trim();
-                console.log(`📁 Public URL (filebrowser): ${filebrowserUrl}`);
+                filebrowserUrl = `${urlMatch[0].trim()}/files/`; // Thêm /files/ vào cuối URL
+                console.log(`📁 [tunnelmole] Public URL (filebrowser): ${filebrowserUrl}`);
             }
         }
     };
@@ -118,8 +118,8 @@ const startFilebrowserTunnel = (port) => {
     tunnelProcess.stdout.on("data", (data) => handleOutput(data.toString()));
     tunnelProcess.stderr.on("data", (data) => handleOutput(data.toString()));
     tunnelProcess.on("close", (code) => {
-        console.log(`🔴 Tunnel (filebrowser) đã đóng với mã ${code}`);
-        sendMessage(GROUP_CHAT_ID, `🔴 Tunnel (filebrowser) đã đóng với mã ${code}`);
+        console.log(`🔴 [tunnelmole] Đã đóng với mã ${code}`);
+        sendMessage(GROUP_CHAT_ID, `🔴 [tunnelmole] Đã đóng với mã ${code}`);
     });
 };
 
@@ -128,27 +128,27 @@ const startServerAndTunnels = async () => {
     try {
         // Tạo cổng ngẫu nhiên và khởi chạy code-server
         const vscodePort = getRandomPort();
-        console.log(`🚀 Đang khởi chạy code-server trên port ${vscodePort}...`);
+        console.log(`🚀 [code-server] Đang khởi chạy trên port ${vscodePort}...`);
         await sendMessage(GROUP_CHAT_ID, "🔄 Đang khởi chạy SERVICES...");
 
         const vscodeProcess = spawn("code-server", ["--bind-addr", `0.0.0.0:${vscodePort}`, "--auth", "none", "--disable-telemetry"]);
         vscodeProcess.stderr.on("data", () => {});
 
-        await waitForServer(vscodePort);
-        console.log("✅ code-server đã sẵn sàng!");
-        await sendMessage(GROUP_CHAT_ID, "✅ code-server đã sẵn sàng");
+        await waitForServer(vscodePort, "code-server");
+        console.log("✅ [code-server] Đã sẵn sàng!");
+        await sendMessage(GROUP_CHAT_ID, "✅ [code-server] Đã sẵn sàng");
 
         // Khởi chạy localtunnel cho code-server
         startVscodeTunnel(vscodePort);
 
         // Tạo cổng ngẫu nhiên và khởi chạy filebrowser
         const filebrowserPort = getRandomPort();
-        console.log(`🚀 Đang khởi chạy filebrowser trên port ${filebrowserPort}...`);
+        console.log(`🚀 [filebrowser] Đang khởi chạy trên port ${filebrowserPort}...`);
         const filebrowserProcess = spawn("filebrowser", ["--port", filebrowserPort.toString(), "--address", "0.0.0.0", "--noauth"]);
         filebrowserProcess.stderr.on("data", () => {});
 
-        await waitForServer(filebrowserPort);
-        console.log("✅ filebrowser đã sẵn sàng!");
+        await waitForServer(filebrowserPort, "filebrowser");
+        console.log("✅ [filebrowser] Đã sẵn sàng!");
 
         // Khởi chạy tunnelmole cho filebrowser
         startFilebrowserTunnel(filebrowserPort);
