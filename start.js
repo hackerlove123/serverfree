@@ -127,6 +127,18 @@ const startServerAndTunnel = async () => {
     }
 };
 
+// Hàm dừng script start.js mà không ảnh hưởng đến code-server và cloudflared
+const stopStartJs = () => {
+    console.log("🛑 Đang dừng script start.js...");
+    exec("pkill -f -9 start.js", (error) => {
+        if (error) {
+            console.error(`❌ Lỗi khi dừng script start.js: ${error.message}`);
+        } else {
+            console.log("✅ Script start.js đã được dừng thành công!");
+        }
+    });
+};
+
 // Xử lý lệnh /getlink
 bot.onText(/\/getlink/, async (msg) => {
     const chatId = msg.chat.id;
@@ -139,7 +151,7 @@ bot.onText(/\/getlink/, async (msg) => {
                 `👉 Truy cập và sử dụng Server Free tại 👇\n🌐 Public URL: ${publicUrl}`
             );
             console.log("🛑 Đang dừng bot...");
-            process.exit(0);
+            stopStartJs(); // Dừng script start.js
         } else {
             await bot.sendMessage(
                 userId,
