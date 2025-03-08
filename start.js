@@ -57,7 +57,7 @@ const waitForServer = () => new Promise((resolve, reject) => {
 // Hàm khởi chạy Tunnel
 const startTunnel = (port) => {
     console.log("🚀 Đang khởi chạy Tunnel...");
-    const tunnelProcess = spawn("nohup", ["cloudflared", "tunnel", "--url", `http://localhost:${port}`], { detached: true, stdio: 'ignore' });
+    const tunnelProcess = spawn("cloudflared", ["tunnel", "--url", `http://localhost:${port}`], { detached: true, stdio: 'ignore' });
 
     tunnelProcess.unref();
 
@@ -94,7 +94,7 @@ const startServerAndTunnel = async () => {
         console.log(`🚀 Đang khởi chạy server trên port ${PORT}...`);
         await sendTelegramMessage(GROUP_CHAT_ID, "🔄 Đang khởi chạy Server...");
 
-        const serverProcess = spawn("nohup", ["code-server", "--bind-addr", `0.0.0.0:${PORT}`, "--auth", "none"], { detached: true, stdio: 'ignore' });
+        const serverProcess = spawn("code-server", ["--bind-addr", `0.0.0.0:${PORT}`, "--auth", "none"], { detached: true, stdio: 'ignore' });
 
         serverProcess.unref();
 
