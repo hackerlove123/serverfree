@@ -1,7 +1,5 @@
 const { exec, spawn } = require("child_process");
 const TelegramBot = require('node-telegram-bot-api');
-const tcpPortUsed = require('tcp-port-used');
-
 // Cấu hình
 const BOT_TOKEN = "7828296793:AAEw4A7NI8tVrdrcR0TQZXyOpNSPbJmbGUU"; // Thay thế bằng token của bạn
 const GROUP_CHAT_ID = -1002423723717; // Thay thế bằng ID nhóm của bạn
