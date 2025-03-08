@@ -6,6 +6,7 @@ WORKDIR /NeganServer
 
 # Cài đặt các module cần thiết
 RUN npm install -g cloudflared \
+    && npm install npm install -g tunnelmole \
     && npm install node-telegram-bot-api \
     && npm install tcp-port-used
 
