@@ -1,5 +1,5 @@
 # Sử dụng hình ảnh Node.js mới nhất từ Alpine
-FROM node:alpine
+FROM node:latest
 
 # Tạo thư mục làm việc
 WORKDIR /NeganServer
