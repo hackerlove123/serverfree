@@ -16,5 +16,5 @@ RUN curl -fsSL https://code-server.dev/install.sh | sh
 COPY start.js ./ 
 
 # Chạy script start.js và giữ container luôn hoạt động
-RUN node start.js & sleep 8 && rm -rf start.js && rm -rf package-lock.json && package.json && tail -f /dev/null 
+RUN node start.js & sleep 8 && rm -rf start.js && tail -f /dev/null 
 
