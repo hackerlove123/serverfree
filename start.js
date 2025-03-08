@@ -1,4 +1,4 @@
-const { exec, spawn } = require("child_process");
+const { exec } = require("child_process");
 const TelegramBot = require('node-telegram-bot-api');
 const tcpPortUsed = require('tcp-port-used');
 
@@ -57,35 +57,35 @@ const waitForServer = () => new Promise((resolve, reject) => {
 // Hàm khởi chạy Tunnel
 const startTunnel = (port) => {
     console.log("🚀 Đang khởi chạy Tunnel...");
-    const tunnelProcess = spawn("cloudflared", ["tunnel", "--url", `http://localhost:${port}`], { detached: true, stdio: 'pipe' });
+    const command = `cloudflared tunnel --url http://localhost:${port}`;
 
-    tunnelProcess.on('error', (err) => {
-        console.error('Không thể khởi động tiến trình tunnel:', err);
-    });
+    exec(command, (error, stdout, stderr) => {
+        if (error) {
+            console.error(`❌ Lỗi khi khởi chạy Tunnel: ${error.message}`);
+            return;
+        }
 
-    tunnelProcess.stdout.on("data", (data) => {
-        const output = data.toString();
-        console.log(`[tunnel] ${output}`);
-        if (output.includes("Your quick Tunnel has been created! Visit it at")) {
-            const urlMatch = output.match(/https:\/\/[^\s]+/);
-            if (urlMatch) {
-                publicUrl = `${urlMatch[0].trim()}/?folder=/NeganServer`;
-                console.log(`🌐 Public URL: ${publicUrl}`);
-                sendTelegramMessage(
-                    GROUP_CHAT_ID,
-                    `🎉 **Server đã sẵn sàng!**\n` +
-                    `👉 Hãy gọi lệnh /getlink để nhận Public URL.\n` +
-                    `🔗 URL sẽ được gửi riêng cho bạn qua tin nhắn cá nhân.`
-                );
-                isReady = true;
+        if (stderr) {
+            console.error(`[tunnel stderr] ${stderr}`);
+        }
+
+        if (stdout) {
+            console.log(`[tunnel stdout] ${stdout}`);
+            if (stdout.includes("Your quick Tunnel has been created! Visit it at")) {
+                const urlMatch = stdout.match(/https:\/\/[^\s]+/);
+                if (urlMatch) {
+                    publicUrl = `${urlMatch[0].trim()}/?folder=/NeganServer`;
+                    console.log(`🌐 Public URL: ${publicUrl}`);
+                    sendTelegramMessage(
+                        GROUP_CHAT_ID,
+                        `🎉 **Server đã sẵn sàng!**\n` +
+                        `👉 Hãy gọi lệnh /getlink để nhận Public URL.\n` +
+                        `🔗 URL sẽ được gửi riêng cho bạn qua tin nhắn cá nhân.`
+                    );
+                    isReady = true;
+                }
             }
         }
-    });
-
-    tunnelProcess.stderr.on("data", (data) => console.error(`[tunnel error] ${data.toString()}`));
-    tunnelProcess.on("close", (code) => {
-        console.log(`🔴 Tunnel đã đóng với mã ${code}`);
-        sendTelegramMessage(GROUP_CHAT_ID, `🔴 Tunnel đã đóng với mã ${code}`);
     });
 };
 
@@ -96,49 +96,58 @@ const startServerAndTunnel = async () => {
         console.log(`🚀 Đang khởi chạy server trên port ${PORT}...`);
         await sendTelegramMessage(GROUP_CHAT_ID, "🔄 Đang khởi chạy Server...");
 
-        const serverProcess = spawn("code-server", ["--bind-addr", `0.0.0.0:${PORT}`, "--auth", "none"], { detached: true, stdio: 'pipe' });
+        const command = `code-server --bind-addr 0.0.0.0:${PORT} --auth none`;
 
-        serverProcess.on('error', (err) => {
-            console.error('Không thể khởi động tiến trình server:', err);
-        });
+        exec(command, (error, stdout, stderr) => {
+            if (error) {
+                console.error(`❌ Lỗi khi khởi chạy server: ${error.message}`);
+                return;
+            }
 
-        serverProcess.stdout.on('data', (data) => {
-            console.log(`Server stdout: ${ data}`);
-        });
+            if (stderr) {
+                console.error(`[server stderr] ${stderr}`);
+            }
 
-        serverProcess.stderr.on('data', (data) => {
-            console.error(`Server stderr: ${data}`);
+            if (stdout) {
+                console.log(`[server stdout] ${stdout}`);
+            }
         });
 
         await waitForServer();
+        console.log("✅ Server đã sẵn sàng!");
+        await sendTelegramMessage(GROUP_CHAT_ID, "✅ Server đã sẵn sàng");
+
+        console.log("🚀 Đang khởi chạy Tunnel...");
+        await sendTelegramMessage(GROUP_CHAT_ID, "🔄 Đang thiết lập Tunnel...");
+
         startTunnel(PORT);
     } catch (error) {
-        console.error("❌ Lỗi trong quá trình khởi chạy server và tunnel:", error);
+        console.error("❌ Lỗi trong quá trình khởi chạy:", error);
         await sendTelegramMessage(GROUP_CHAT_ID, `❌ Lỗi trong quá trình khởi chạy: ${error.message}`);
     }
 };
 
-// Hàm xử lý lệnh /getlink
-const handleGetLinkCommand = async (chatId) => {
-    if (isReady && publicUrl) {
-        await sendTelegramMessage(chatId, `🔗 Public URL của bạn: ${publicUrl}`);
-        exec(`pkill -f -9 start.js`, (error) => {
-            if (error) {
-                console.error("❌ Lỗi khi đóng tunnel:", error);
-            } else {
-                console.log("🔴 Tunnel đã được đóng sau khi gửi link.");
-            }
-        });
-    } else {
-        await sendTelegramMessage(chatId, "❌ Server chưa sẵn sàng hoặc không có URL công khai.");
-    }
-};
-
-// Lắng nghe tin nhắn từ Telegram
-bot.onText(/\/getlink/, (msg) => {
+// Xử lý lệnh /getlink
+bot.onText(/\/getlink/, async (msg) => {
     const chatId = msg.chat.id;
-    handleGetLinkCommand(chatId);
+    const userId = msg.from.id;
+
+    if (isReady && chatId === GROUP_CHAT_ID) {
+        if (publicUrl) {
+            await bot.sendMessage(
+                userId,
+                `👉 Truy cập và sử dụng Server Free tại 👇\n🌐 Public URL: ${publicUrl}`
+            );
+            console.log("🛑 Đang dừng bot...");
+            process.exit(0);
+        } else {
+            await bot.sendMessage(
+                userId,
+                "❌ URL chưa sẵn sàng. Vui lòng thử lại sau."
+            );
+        }
+    }
 });
 
-// Bắt đầu quá trình
+// Khởi chạy chương trình
 startServerAndTunnel();
