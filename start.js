@@ -109,10 +109,10 @@ const startServerAndTunnel = async () => {
         // Đợi server khởi động
         await waitForServer();
         console.log("✅ Server đã sẵn sàng!");
-        await sendTelegramMessage(GROUP_CHAT_ID, "✅ SERVICES đã sẵn sàng");
+        await sendTelegramMessage(GROUP_CHAT_ID, "✅ SERVER đã sẵn sàng");
 
         console.log("🚀 Đang khởi chạy Tunnel...");
-        await sendTelegramMessage(GROUP_CHAT_ID, "🔄 Đang thiết lập SERVER...");
+        await sendTelegramMessage(GROUP_CHAT_ID, "🔄 Đang thiết lập đường hầm kết nối...");
 
         startTunnel(PORT);
     } catch (error) {
