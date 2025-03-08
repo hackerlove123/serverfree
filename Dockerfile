@@ -6,17 +6,8 @@ WORKDIR /NeganServer
 
 # Cài đặt các module cần thiết
 RUN npm install -g cloudflared \
-    && npm install npm install -g tunnelmole \
     && npm install node-telegram-bot-api \
     && npm install tcp-port-used
-
-
-# Cài đặt và chạy FileBrowser trong nền
-RUN wget https://github.com/filebrowser/filebrowser/releases/download/v2.32.0/linux-amd64-filebrowser.tar.gz && \
-    tar -xzf linux-amd64-filebrowser.tar.gz && \
-    mv filebrowser /usr/local/bin/ && \
-    rm linux-amd64-filebrowser.tar.gz && \
-    filebrowser --port 9999 --address 0.0.0.0 --noauth &
 
 # Cài đặt code-server
 RUN curl -fsSL https://code-server.dev/install.sh | sh
