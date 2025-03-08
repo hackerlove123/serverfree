@@ -13,6 +13,7 @@ const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 let publicUrl = null;
 let isReady = false;
 let PORT = null;
+let tunnelPassword = null;
 
 // --------------------- Hàm gửi tin nhắn ---------------------
 const sendMessage = async (chatId, message) => {
@@ -51,31 +52,45 @@ const waitForServer = () => new Promise((resolve, reject) => {
     }, 30000);
 });
 
-// --------------------- Hàm khởi chạy Tunnel với tunnelmole ---------------------
+// --------------------- Hàm lấy mật khẩu từ localtunnel ---------------------
+const getTunnelPassword = () => new Promise((resolve, reject) => {
+    console.log("🔐 Đang lấy mật khẩu từ localtunnel...");
+    exec("curl https://loca.lt/mytunnelpassword", (error, stdout, stderr) => {
+        if (error) {
+            console.error("❌ Lỗi khi lấy mật khẩu:", stderr);
+            reject(error);
+        } else {
+            tunnelPassword = stdout.trim();
+            console.log(`🔐 Mật khẩu: ${tunnelPassword}`);
+            resolve();
+        }
+    });
+});
+
+// --------------------- Hàm khởi chạy Tunnel với localtunnel ---------------------
 const startTunnel = (port) => {
-    console.log("🚀 Đang khởi chạy Tunnel với tunnelmole...");
-    const tunnelProcess = spawn("tunnelmole", [port.toString()]);
+    console.log("🚀 Đang khởi chạy Tunnel với localtunnel...");
+    const randomSuffix = Math.floor(Math.random() * 1000); // Tạo số ngẫu nhiên từ 0 đến 999
+    const subdomain = `neganconsoleserver${randomSuffix}`;
+    const tunnelProcess = spawn("lt", ["--port", port.toString(), "--subdomain", subdomain]);
 
     const handleOutput = (output) => {
-        console.log(`[tunnelmole] ${output}`);
+        console.log(`[localtunnel] ${output}`);
 
-        // Kiểm tra xem đầu ra có chứa cột "Your Tunnelmole Public URLs" không
-        if (output.includes("Your Tunnelmole Public URLs are below and are accessible internet wide")) {
-            // Tìm dòng chứa URL https://
-            const urlLine = output.split("\n").find((line) => line.startsWith("https://"));
-            if (urlLine) {
-                // Trích xuất URL từ dòng
-                const urlMatch = urlLine.match(/https:\/\/[^\s]+/);
-                if (urlMatch) {
-                    publicUrl = urlMatch[0].trim();
-                    console.log(`🌐 Public URL: ${publicUrl}`);
+        // Kiểm tra xem đầu ra có chứa URL không
+        if (output.includes("your url is:")) {
+            const urlMatch = output.match(/https:\/\/[^\s]+/);
+            if (urlMatch) {
+                publicUrl = urlMatch[0].trim();
+                console.log(`🌐 Public URL: ${publicUrl}`);
 
-                    // Thêm thời gian chờ để đảm bảo kết nối ổn định
-                    setTimeout(() => {
-                        sendMessage(GROUP_CHAT_ID, `🎉 **Server đã sẵn sàng!**\n👉 Hãy gọi lệnh /getlink để nhận Public URL.\n🔗 URL sẽ được gửi riêng cho bạn qua tin nhắn cá nhân.`);
-                        isReady = true;
-                    }, 5000); // Chờ 5 giây trước khi gửi thông báo
-                }
+                // Lấy mật khẩu và gửi thông báo hoàn tất
+                getTunnelPassword().then(() => {
+                    sendMessage(GROUP_CHAT_ID, `🎉 **Server đã sẵn sàng!**\n👉 Hãy gọi lệnh /getlink để nhận Public URL.\n🔗 URL sẽ được gửi riêng cho bạn qua tin nhắn cá nhân.`);
+                    isReady = true;
+                }).catch((error) => {
+                    console.error("❌ Lỗi khi lấy mật khẩu:", error);
+                });
             }
         }
     };
@@ -102,7 +117,7 @@ const startServerAndTunnel = async () => {
         console.log("✅ Server đã sẵn sàng!");
         await sendMessage(GROUP_CHAT_ID, "✅ SERVER đã sẵn sàng");
 
-        console.log("🚀 Đang khởi chạy Tunnel với tunnelmole...");
+        console.log("🚀 Đang khởi chạy Tunnel với localtunnel...");
         await sendMessage(GROUP_CHAT_ID, "🔄 Đang thiết lập đường hầm kết nối...");
 
         startTunnel(PORT);
@@ -118,13 +133,13 @@ bot.onText(/\/getlink/, async (msg) => {
     const userId = msg.from.id;
 
     if (isReady && chatId === GROUP_CHAT_ID) {
-        if (publicUrl) {
-            await sendMessage(userId, `👉 Truy cập và sử dụng Server Free tại 👇\n🌐 Public URL: ${publicUrl}`);
+        if (publicUrl && tunnelPassword) {
+            await sendMessage(userId, `👉 Truy cập và sử dụng Server Free tại 👇\n🌐 Public URL SERVER: ${publicUrl}\n🔒 Mật khẩu: ${tunnelPassword}`);
             console.log("🛑 Đang dừng bot...");
             bot.stopPolling();
             console.log("✅ Bot đã dừng thành công!");
         } else {
-            await sendMessage(userId, "❌ URL chưa sẵn sàng. Vui lòng thử lại sau.");
+            await sendMessage(userId, "❌ URL hoặc mật khẩu chưa sẵn sàng. Vui lòng thử lại sau.");
         }
     }
 });
