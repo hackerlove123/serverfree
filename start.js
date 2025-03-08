@@ -47,37 +47,32 @@ const waitForCodeServer = () => new Promise((resolve, reject) => {
 const startCloudflaredTunnel = (port) => {
     console.log("🚀 Đang khởi chạy Cloudflare Tunnel...");
     const cloudflaredProcess = spawn("cloudflared", ["tunnel", "--url", `http://localhost:${port}`]);
-    let isTunnelCreatedLine = false;
 
     const handleOutput = (output) => {
-        output.split("\n").forEach((line) => {
-            console.log(`[cloudflared] ${line}`);
-            if (line.includes("Your quick Tunnel has been created! Visit it at")) {
-                isTunnelCreatedLine = true;
-            } else if (isTunnelCreatedLine) {
-                const urlMatch = line.match(/https:\/\/[^\s]+/); // Sửa regex để bắt URL chính xác hơn
-                if (urlMatch) {
-                    let tunnelUrl = urlMatch[0].trim().replace('|', '').trim();
-                    publicUrl = `${tunnelUrl}/?folder=/NeganServer`; // Lưu URL
-                    console.log(`🌐 Public URL: ${publicUrl}`);
+        console.log(`[cloudflared] ${output}`); // Log toàn bộ đầu ra để debug
 
-                    // Gửi thông báo hoàn tất
-                    sendTelegramMessage(
-                        GROUP_CHAT_ID,
-                        `🎉 **Server đã sẵn sàng!**\n` +
-                        `👉 Hãy gọi lệnh /getlink để nhận Public URL.\n` +
-                        `🔗 URL sẽ được gửi riêng cho bạn qua tin nhắn cá nhân.`
-                    ).then(() => {
-                        console.log("📤 Tin nhắn thông báo đã được gửi thành công!");
-                    }).catch((error) => {
-                        console.error("❌ Lỗi khi gửi tin nhắn thông báo:", error);
-                    });
+        // Kiểm tra xem đầu ra có chứa URL không
+        if (output.includes("https://")) {
+            const urlMatch = output.match(/https:\/\/[^\s]+/); // Trích xuất URL
+            if (urlMatch) {
+                publicUrl = `${urlMatch[0].trim()}/?folder=/NeganServer`; // Lưu URL
+                console.log(`🌐 Public URL: ${publicUrl}`);
 
-                    isTunnelCreatedLine = false; // Đặt lại cờ
-                    isReady = true; // Đánh dấu bot đã sẵn sàng
-                }
+                // Gửi thông báo hoàn tất
+                sendTelegramMessage(
+                    GROUP_CHAT_ID,
+                    `🎉 **Server đã sẵn sàng!**\n` +
+                    `👉 Hãy gọi lệnh /getlink để nhận Public URL.\n` +
+                    `🔗 URL sẽ được gửi riêng cho bạn qua tin nhắn cá nhân.`
+                ).then(() => {
+                    console.log("📤 Tin nhắn thông báo đã được gửi thành công!");
+                }).catch((error) => {
+                    console.error("❌ Lỗi khi gửi tin nhắn thông báo:", error);
+                });
+
+                isReady = true; // Đánh dấu bot đã sẵn sàng
             }
-        });
+        }
     };
 
     cloudflaredProcess.stdout.on("data", (data) => handleOutput(data.toString()));
