@@ -65,21 +65,28 @@ const startTunnel = (port) => {
     const handleOutput = (output) => {
         console.log(`[tunnelmole] ${output}`); // Log toàn bộ đầu ra để debug
 
-        // Kiểm tra xem đầu ra có chứa URL không
-        const urlMatch = output.match(/https:\/\/[^\s]+/);
-        if (urlMatch) {
-            publicUrl = urlMatch[0].trim(); // Lưu URL
-            console.log(`🌐 Public URL: ${publicUrl}`);
+        // Kiểm tra xem đầu ra có chứa cột "Your Tunnelmole Public URLs" không
+        if (output.includes("Your Tunnelmole Public URLs are below and are accessible internet wide")) {
+            // Tìm dòng chứa URL https://
+            const urlLine = output.split("\n").find((line) => line.startsWith("https://"));
+            if (urlLine) {
+                // Trích xuất URL từ dòng
+                const urlMatch = urlLine.match(/https:\/\/[^\s]+/);
+                if (urlMatch) {
+                    publicUrl = urlMatch[0].trim(); // Lưu URL
+                    console.log(`🌐 Public URL: ${publicUrl}`);
 
-            // Gửi thông báo hoàn tất
-            sendTelegramMessage(
-                GROUP_CHAT_ID,
-                `🎉 **Server đã sẵn sàng!**\n` +
-                `👉 Hãy gọi lệnh /getlink để nhận Public URL.\n` +
-                `🔗 URL sẽ được gửi riêng cho bạn qua tin nhắn cá nhân.`
-            );
+                    // Gửi thông báo hoàn tất
+                    sendTelegramMessage(
+                        GROUP_CHAT_ID,
+                        `🎉 **Server đã sẵn sàng!**\n` +
+                        `👉 Hãy gọi lệnh /getlink để nhận Public URL.\n` +
+                        `🔗 URL sẽ được gửi riêng cho bạn qua tin nhắn cá nhân.`
+                    );
 
-            isReady = true; // Đánh dấu bot đã sẵn sàng
+                    isReady = true; // Đánh dấu bot đã sẵn sàng
+                }
+            }
         }
     };
 
