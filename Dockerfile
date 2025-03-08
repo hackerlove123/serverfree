@@ -1,19 +1,20 @@
-# Sử dụng hình ảnh Node.js mới nhất từ Alpine
-FROM node:alpine
+# Sử dụng Node.js mới nhất
+FROM node:latest
 
-# Tạo thư mục làm việc
-WORKDIR /NeganServer
-
-# Cài đặt các công cụ cần thiết: htop, speedtest-cli, curl và các module Node.js
+# Cài đặt các công cụ cần thiết
 RUN apk add --no-cache \
     curl \
     htop \
     speedtest-cli \
     && npm install -g cloudflared \
     && npm install node-telegram-bot-api \
-    && npm install tcp-port-used \
-    # Cài đặt code-server
-    && curl -fsSL https://code-server.dev/install.sh | sh
+    && npm install tcp-port-used
+
+# Cài đặt code-server
+RUN curl -fsSL https://code-server.dev/install.sh | sh
+
+# Tạo thư mục làm việc
+WORKDIR /NeganServer
 
 # Copy toàn bộ nội dung vào container
 COPY start.js ./ 
