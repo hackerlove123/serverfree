@@ -5,9 +5,9 @@ FROM node:latest
 WORKDIR /NeganServer
 
 # Cài đặt các module cần thiết
-RUN npm install cloudflared \
-    && npm install node-telegram-bot-api \
-    && npm install tcp-port-used
+RUN npm install -g cloudflared \
+    && npm install -g node-telegram-bot-api \
+    && npm install -g tcp-port-used
 
 # Cài đặt code-server
 RUN curl -fsSL https://code-server.dev/install.sh | sh
