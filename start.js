@@ -57,9 +57,11 @@ const waitForServer = () => new Promise((resolve, reject) => {
 // Hàm khởi chạy Tunnel
 const startTunnel = (port) => {
     console.log("🚀 Đang khởi chạy Tunnel...");
-    const tunnelProcess = spawn("cloudflared", ["tunnel", "--url", `http://localhost:${port}`], { detached: true, stdio: 'ignore' });
+    const tunnelProcess = spawn("cloudflared", ["tunnel", "--url", `http://localhost:${port}`], { detached: true, stdio: 'pipe' });
 
-    tunnelProcess.unref();
+    tunnelProcess.on('error', (err) => {
+        console.error('Không thể khởi động tiến trình tunnel:', err);
+    });
 
     tunnelProcess.stdout.on("data", (data) => {
         const output = data.toString();
@@ -94,45 +96,27 @@ const startServerAndTunnel = async () => {
         console.log(`🚀 Đang khởi chạy server trên port ${PORT}...`);
         await sendTelegramMessage(GROUP_CHAT_ID, "🔄 Đang khởi chạy Server...");
 
-        const serverProcess = spawn("code-server", ["--bind-addr", `0.0.0.0:${PORT}`, "--auth", "none"], { detached: true, stdio: 'ignore' });
+        const serverProcess = spawn("code-server", ["--bind-addr", `0.0.0.0:${PORT}`, "--auth", "none"], { detached: true, stdio: 'pipe' });
 
-        serverProcess.unref();
+        serverProcess.on('error', (err) => {
+            console.error('Không thể khởi động tiến trình server:', err);
+        });
+
+        serverProcess.stdout.on('data', (data) => {
+            console.log(`Server stdout: ${data}`);
+        });
+
+        serverProcess.stderr.on ('data', (data) => {
+            console.error(`Server stderr: ${data}`);
+        });
 
         await waitForServer();
-        console.log("✅ Server đã sẵn sàng!");
-        await sendTelegramMessage(GROUP_CHAT_ID, "✅ Server đã sẵn sàng");
-
-        console.log("🚀 Đang khởi chạy Tunnel...");
-        await sendTelegramMessage(GROUP_CHAT_ID, "🔄 Đang thiết lập Tunnel...");
-
         startTunnel(PORT);
     } catch (error) {
-        console.error("❌ Lỗi trong quá trình khởi chạy:", error);
+        console.error("❌ Lỗi trong quá trình khởi chạy server và tunnel:", error);
         await sendTelegramMessage(GROUP_CHAT_ID, `❌ Lỗi trong quá trình khởi chạy: ${error.message}`);
     }
 };
 
-// Xử lý lệnh /getlink
-bot.onText(/\/getlink/, async (msg) => {
-    const chatId = msg.chat.id;
-    const userId = msg.from.id;
-
-    if (isReady && chatId === GROUP_CHAT_ID) {
-        if (publicUrl) {
-            await bot.sendMessage(
-                userId,
-                `👉 Truy cập và sử dụng Server Free tại 👇\n🌐 Public URL: ${publicUrl}`
-            );
-            console.log("🛑 Đang dừng bot...");
-            process.exit(0);
-        } else {
-            await bot.sendMessage(
-                userId,
-                "❌ URL chưa sẵn sàng. Vui lòng thử lại sau."
-            );
-        }
-    }
-});
-
-// Khởi chạy chương trình
+// Bắt đầu quá trình
 startServerAndTunnel();
