@@ -9,9 +9,7 @@ RUN curl -fsSL https://code-server.dev/install.sh | sh && \
     npm install -g cloudflared && \
     npm install node-telegram-bot-api && \
     npm install axios && \
-    npm install tcp-port-used && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+    npm install tcp-port-used
 
 # Copy toàn bộ nội dung vào container
 COPY start.js ./
