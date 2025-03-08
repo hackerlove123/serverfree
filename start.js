@@ -10,10 +10,11 @@ const GROUP_CHAT_ID = -1002423723717; // Thay thế bằng ID nhóm của bạn
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 
 // Biến toàn cục
-let publicUrl = null;
+let vscodeUrl = null;
 let filebrowserUrl = null;
 let isReady = false;
-let PORT = null;
+let vscodePort = null;
+let filebrowserPort = null;
 let tunnelPassword = null;
 
 // --------------------- Hàm gửi tin nhắn ---------------------
@@ -26,22 +27,22 @@ const sendMessage = async (chatId, message) => {
     }
 };
 
-// --------------------- Hàm kiểm tra port trống ---------------------
+// --------------------- Hàm tìm cổng trống trong khoảng 3000-6999 ---------------------
 const findAvailablePort = async () => {
-    for (let port = 1024; port <= 65535; port++) {
+    for (let port = 3000; port <= 6999; port++) {
         if (!(await tcpPortUsed.check(port, '127.0.0.1'))) return port;
     }
     throw new Error("❌ Không tìm thấy port trống.");
 };
 
 // --------------------- Hàm kiểm tra server ---------------------
-const waitForServer = () => new Promise((resolve, reject) => {
-    console.log("🕒 Đang kiểm tra server...");
+const waitForServer = (port) => new Promise((resolve, reject) => {
+    console.log(`🕒 Đang kiểm tra server trên port ${port}...`);
     const interval = setInterval(() => {
-        exec(`curl -s http://localhost:${PORT}`, (error) => {
+        exec(`curl -s http://localhost:${port}`, (error) => {
             if (!error) {
                 clearInterval(interval);
-                console.log("✅ Server đã sẵn sàng!");
+                console.log(`✅ Server trên port ${port} đã sẵn sàng!`);
                 resolve();
             }
         });
@@ -49,7 +50,7 @@ const waitForServer = () => new Promise((resolve, reject) => {
 
     setTimeout(() => {
         clearInterval(interval);
-        reject(new Error("❌ Không thể kết nối đến server sau 30 giây."));
+        reject(new Error(`❌ Không thể kết nối đến server trên port ${port} sau 30 giây.`));
     }, 30000);
 });
 
@@ -68,9 +69,9 @@ const getTunnelPassword = () => new Promise((resolve, reject) => {
     });
 });
 
-// --------------------- Hàm khởi chạy Tunnel với localtunnel ---------------------
-const startTunnel = (port) => {
-    console.log("🚀 Đang khởi chạy Tunnel với localtunnel...");
+// --------------------- Hàm khởi chạy localtunnel cho code-server ---------------------
+const startVscodeTunnel = (port) => {
+    console.log("🚀 Đang khởi chạy localtunnel cho code-server...");
     const randomSuffix = Math.floor(Math.random() * 1000); // Tạo số ngẫu nhiên từ 0 đến 999
     const subdomain = `neganconsoleserver${randomSuffix}`;
     const tunnelProcess = spawn("lt", ["--port", port.toString(), "--subdomain", subdomain]);
@@ -82,8 +83,8 @@ const startTunnel = (port) => {
         if (output.includes("your url is:")) {
             const urlMatch = output.match(/https:\/\/[^\s]+/);
             if (urlMatch) {
-                publicUrl = `${urlMatch[0].trim()}/?folder=/NeganServer`;
-                console.log(`🌐 Public URL: ${publicUrl}`);
+                vscodeUrl = `${urlMatch[0].trim()}/?folder=/NeganServer`;
+                console.log(`🌐 Public URL (code-server): ${vscodeUrl}`);
 
                 // Lấy mật khẩu và gửi thông báo hoàn tất
                 getTunnelPassword().then(() => {
@@ -99,56 +100,66 @@ const startTunnel = (port) => {
     tunnelProcess.stdout.on("data", (data) => handleOutput(data.toString()));
     tunnelProcess.stderr.on("data", (data) => handleOutput(data.toString()));
     tunnelProcess.on("close", (code) => {
-        console.log(`🔴 Tunnel đã đóng với mã ${code}`);
-        sendMessage(GROUP_CHAT_ID, `🔴 Tunnel đã đóng với mã ${code}`);
+        console.log(`🔴 Tunnel (code-server) đã đóng với mã ${code}`);
+        sendMessage(GROUP_CHAT_ID, `🔴 Tunnel (code-server) đã đóng với mã ${code}`);
     });
 };
 
-// --------------------- Hàm khởi chạy filebrowser ---------------------
-const startFilebrowser = async () => {
-    try {
-        const filebrowserPort = await findAvailablePort();
-        console.log(`🚀 Đang khởi chạy filebrowser trên port ${filebrowserPort}...`);
-        const filebrowserProcess = spawn("filebrowser", ["--port", filebrowserPort.toString(), "--address", "0.0.0.0", "--noauth"]);
+// --------------------- Hàm khởi chạy tunnelmole cho filebrowser ---------------------
+const startFilebrowserTunnel = (port) => {
+    console.log("🚀 Đang khởi chạy tunnelmole cho filebrowser...");
+    const tunnelProcess = spawn("tunnelmole", [port.toString()]);
 
-        filebrowserProcess.stdout.on("data", (data) => {
-            console.log(`[filebrowser] ${data.toString()}`);
-        });
+    const handleOutput = (output) => {
+        console.log(`[tunnelmole] ${output}`);
 
-        filebrowserProcess.stderr.on("data", (data) => {
-            console.error(`[filebrowser error] ${data.toString()}`);
-        });
+        // Kiểm tra xem đầu ra có chứa URL không
+        if (output.includes("Your Tunnelmole Public URLs are below and are accessible internet wide")) {
+            const urlLine = output.split("\n").find((line) => line.startsWith("https://"));
+            if (urlLine) {
+                filebrowserUrl = urlLine.match(/https:\/\/[^\s]+/)[0].trim();
+                console.log(`📁 Public URL (filebrowser): ${filebrowserUrl}`);
+            }
+        }
+    };
 
-        filebrowserProcess.on("close", (code) => {
-            console.log(`🔴 Filebrowser đã đóng với mã ${code}`);
-        });
-
-        filebrowserUrl = `https://neganconsoleserver${Math.floor(Math.random() * 1000)}.loca.lt/files/`;
-        console.log(`📁 Filebrowser URL: ${filebrowserUrl}`);
-    } catch (error) {
-        console.error("❌ Lỗi khi khởi chạy filebrowser:", error);
-    }
+    tunnelProcess.stdout.on("data", (data) => handleOutput(data.toString()));
+    tunnelProcess.stderr.on("data", (data) => handleOutput(data.toString()));
+    tunnelProcess.on("close", (code) => {
+        console.log(`🔴 Tunnel (filebrowser) đã đóng với mã ${code}`);
+        sendMessage(GROUP_CHAT_ID, `🔴 Tunnel (filebrowser) đã đóng với mã ${code}`);
+    });
 };
 
-// --------------------- Hàm khởi chạy server, Tunnel và filebrowser ---------------------
-const startServerAndTunnel = async () => {
+// --------------------- Hàm khởi chạy server và các tunnel ---------------------
+const startServerAndTunnels = async () => {
     try {
-        PORT = await findAvailablePort();
-        console.log(`🚀 Đang khởi chạy server trên port ${PORT}...`);
+        // Tìm cổng và khởi chạy code-server
+        vscodePort = await findAvailablePort();
+        console.log(`🚀 Đang khởi chạy code-server trên port ${vscodePort}...`);
         await sendMessage(GROUP_CHAT_ID, "🔄 Đang khởi chạy SERVICES...");
 
-        const serverProcess = spawn("code-server", ["--bind-addr", `0.0.0.0:${PORT}`, "--auth", "none", "--disable-telemetry"]);
-        serverProcess.stderr.on("data", () => {});
+        const vscodeProcess = spawn("code-server", ["--bind-addr", `0.0.0.0:${vscodePort}`, "--auth", "none", "--disable-telemetry"]);
+        vscodeProcess.stderr.on("data", () => {});
 
-        await waitForServer();
-        console.log("✅ Server đã sẵn sàng!");
-        await sendMessage(GROUP_CHAT_ID, "✅ SERVER đã sẵn sàng");
+        await waitForServer(vscodePort);
+        console.log("✅ code-server đã sẵn sàng!");
+        await sendMessage(GROUP_CHAT_ID, "✅ code-server đã sẵn sàng");
 
-        console.log("🚀 Đang khởi chạy Tunnel với localtunnel...");
-        await sendMessage(GROUP_CHAT_ID, "🔄 Đang thiết lập đường hầm kết nối...");
+        // Khởi chạy localtunnel cho code-server
+        startVscodeTunnel(vscodePort);
 
-        startTunnel(PORT);
-        await startFilebrowser();
+        // Tìm cổng và khởi chạy filebrowser
+        filebrowserPort = await findAvailablePort();
+        console.log(`🚀 Đang khởi chạy filebrowser trên port ${filebrowserPort}...`);
+        const filebrowserProcess = spawn("filebrowser", ["--port", filebrowserPort.toString(), "--address", "0.0.0.0", "--noauth"]);
+        filebrowserProcess.stderr.on("data", () => {});
+
+        await waitForServer(filebrowserPort);
+        console.log("✅ filebrowser đã sẵn sàng!");
+
+        // Khởi chạy tunnelmole cho filebrowser
+        startFilebrowserTunnel(filebrowserPort);
     } catch (error) {
         console.error("❌ Lỗi trong quá trình khởi chạy:", error);
         await sendMessage(GROUP_CHAT_ID, `❌ Lỗi trong quá trình khởi chạy: ${error.message}`);
@@ -161,16 +172,16 @@ bot.onText(/\/getlink/, async (msg) => {
     const userId = msg.from.id;
 
     if (isReady && chatId === GROUP_CHAT_ID) {
-        if (publicUrl && tunnelPassword && filebrowserUrl) {
-            await sendMessage(userId, `👉 Truy cập và sử dụng Server Free tại 👇\n🌐 Public URL SERVER: ${publicUrl}\n🔒 Mật khẩu: ${tunnelPassword}\n📁 Manager File 👉 ${filebrowserUrl}`);
+        if (vscodeUrl && tunnelPassword && filebrowserUrl) {
+            await sendMessage(userId, `👉 Truy cập và sử dụng Server Free tại 👇\n🌐 Public URL SERVER: ${vscodeUrl}\n🔒 Mật khẩu: ${tunnelPassword}\n📁 Manager File 👉 ${filebrowserUrl}`);
             console.log("🛑 Đang dừng bot...");
             bot.stopPolling();
             console.log("✅ Bot đã dừng thành công!");
         } else {
-            await sendMessage(userId, `👉 Truy cập và sử dụng Server Free tại 👇\n🌐 Public URL SERVER: ${publicUrl || "URL hoặc mật khẩu chưa sẵn sàng. Vui lòng thử lại sau. ❌"}\n🔒 Mật khẩu: ${tunnelPassword || "ERROR ❌"}\n📁 Manager File 👉 ${filebrowserUrl || "URL hoặc mật khẩu chưa sẵn sàng. Vui lòng thử lại sau. ❌"}`);
+            await sendMessage(userId, `👉 Truy cập và sử dụng Server Free tại 👇\n🌐 Public URL SERVER: ${vscodeUrl || "URL hoặc mật khẩu chưa sẵn sàng. Vui lòng thử lại sau. ❌"}\n🔒 Mật khẩu: ${tunnelPassword || "ERROR ❌"}\n📁 Manager File 👉 ${filebrowserUrl || "URL hoặc mật khẩu chưa sẵn sàng. Vui lòng thử lại sau. ❌"}`);
         }
     }
 });
 
 // --------------------- Khởi chạy chương trình ---------------------
-startServerAndTunnel();
+startServerAndTunnels();
