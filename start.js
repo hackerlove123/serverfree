@@ -74,7 +74,7 @@ const startFilebrowserTunnel = (port) => {
     const handleOutput = (output) => {
         console.log(`[tunnelmole] ${output}`);
         if (output.includes("Your Tunnelmole Public URLs are below and are accessible internet wide")) {
-            const urlLine = output.split("\n").find((line) => line.includes("⟶") && line.startsWith("https://"));
+            const urlLine = output.split("\n").find((line) => line.includes("⟶") && line.startsWith("https://") && line.includes(".net"));
             if (urlLine) {
                 filebrowserUrl = urlLine.split("⟶")[0].trim() + "/files/"; // Thêm /files/ vào cuối URL
                 console.log(`📁 [tunnelmole] Public URL (filebrowser): ${filebrowserUrl}`);
