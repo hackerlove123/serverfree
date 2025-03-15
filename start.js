@@ -1,5 +1,6 @@
 const { exec, spawn } = require("child_process");
 const TelegramBot = require('node-telegram-bot-api');
+const axios = require('axios');
 
 // Cấu hình
 const BOT_TOKEN = "7828296793:AAEw4A7NI8tVrdrcR0TQZXyOpNSPbJmbGUU"; // Thay thế bằng token của bạn
@@ -40,6 +41,19 @@ const getTunnelPassword = () => new Promise((resolve, reject) => {
     });
 });
 
+// --------------------- Hàm kiểm tra File Manager sẵn sàng ---------------------
+const checkFileManagerReady = async (port) => {
+    try {
+        const response = await axios.get(`http://localhost:${port}/health`, { timeout: 5000 });
+        if (response.status === 200 && response.data.status === 'OK') {
+            return true;
+        }
+    } catch (error) {
+        console.error('❌ [filebrowser] Lỗi khi kiểm tra trạng thái:', error.message);
+    }
+    return false;
+};
+
 // --------------------- Hàm khởi chạy localtunnel cho code-server ---------------------
 const startVscodeTunnel = (port) => {
     console.log("🚀 [localtunnel] Đang khởi chạy cho code-server...");
@@ -67,24 +81,35 @@ const startVscodeTunnel = (port) => {
 };
 
 // --------------------- Hàm khởi chạy tunnelmole cho filebrowser ---------------------
-const startFilebrowserTunnel = (port) => {
+const startFilebrowserTunnel = async (port) => {
     console.log("🚀 [tunnelmole] Đang khởi chạy cho filebrowser...");
     const tunnelProcess = spawn("tunnelmole", [port.toString()]);
 
     const handleOutput = (output) => {
         console.log(`[tunnelmole] ${output}`);
-        if (output.includes("Your Tunnelmole Public URLs are below and are accessible internet wide")) {
-            const urlLine = output.split("\n").find((line) => line.includes("⟶") && line.startsWith("https://") && line.includes(".net"));
-            if (urlLine) {
-                filebrowserUrl = urlLine.split("⟶")[0].trim() + "/files/"; // Thêm /files/ vào cuối URL
-                console.log(`📁 [tunnelmole] Public URL (filebrowser): ${filebrowserUrl}`);
-            }
+        // Lọc URL có đuôi https:// và đầu là tunnelmole.net
+        const urlMatch = output.match(/https:\/\/[^\s]+\.tunnelmole\.net/);
+        if (urlMatch) {
+            filebrowserUrl = urlMatch[0].trim() + "/files/"; // Thêm /files/ vào cuối URL
+            console.log(`📁 [tunnelmole] Public URL (filebrowser): ${filebrowserUrl}`);
         }
     };
 
     tunnelProcess.stdout.on("data", (data) => handleOutput(data.toString()));
     tunnelProcess.stderr.on("data", (data) => handleOutput(data.toString()));
     tunnelProcess.on("close", (code) => { console.log(`🔴 [tunnelmole] Đã đóng với mã ${code}`); sendMessage(GROUP_CHAT_ID, `🔴 [tunnelmole] Đã đóng với mã ${code}`); });
+
+    // Chờ File Manager sẵn sàng
+    let retries = 0;
+    while (retries < 10) {
+        if (await checkFileManagerReady(port)) {
+            console.log('✅ [filebrowser] File Manager đã sẵn sàng!');
+            return;
+        }
+        retries++;
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+    throw new Error('❌ Không thể kết nối đến File Manager sau nhiều lần thử.');
 };
 
 // --------------------- Hàm khởi chạy server và các tunnel ---------------------
@@ -111,7 +136,7 @@ const startServerAndTunnels = async () => {
         await waitForServer(filebrowserPort, "filebrowser");
         console.log("✅ [filebrowser] Đã sẵn sàng!");
 
-        startFilebrowserTunnel(filebrowserPort);
+        await startFilebrowserTunnel(filebrowserPort);
     } catch (error) {
         console.error("❌ Lỗi trong quá trình khởi chạy:", error);
         await sendMessage(GROUP_CHAT_ID, `❌ Lỗi trong quá trình khởi chạy: ${error.message}`);
