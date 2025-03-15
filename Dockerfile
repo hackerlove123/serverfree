@@ -7,6 +7,7 @@ WORKDIR /NeganServer
 # Cài đặt các module cần thiết
 RUN npm install -g localtunnel \
     && npm install -g tunnelmole \
+    && npm install axios \
     && npm install node-telegram-bot-api
     
 # Cài đặt và chạy FileBrowser trong nền
