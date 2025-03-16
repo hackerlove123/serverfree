@@ -1,0 +1,6 @@
+version: 1.0.{build}
+image: Ubuntu2004  # Chọn Ubuntu 20.04 làm môi trường build
+build_script:
+  - echo "Bắt đầu build trên Ubuntu 20.04..."
+  - docker build -t myapp .
+  - echo "Build hoàn tất!"
