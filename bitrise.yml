@@ -1,0 +1,12 @@
+format_version: "11"
+default_step_lib_source: https://github.com/bitrise-io/bitrise-steplib.git
+
+workflows:
+  primary:
+    steps:
+      - script:
+          title: Build Docker Image
+          inputs:
+            - content: |
+                #!/bin/bash
+                docker build -t my-image-name -f Dockerfile .
