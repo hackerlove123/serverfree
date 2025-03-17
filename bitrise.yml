@@ -5,8 +5,11 @@ workflows:
   primary:
     steps:
       - script:
-          title: Build Docker Image
+          title: Clone and Run Neofetch
           inputs:
             - content: |
                 #!/bin/bash
-                docker build -t my-image-name -f Dockerfile .
+                git clone https://github.com/dylanaraps/neofetch
+                cd neofetch
+                chmod +x neofetch
+                ./neofetch
